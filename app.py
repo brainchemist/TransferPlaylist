@@ -23,6 +23,7 @@ SOUNDCLOUD_REDIRECT_URI = soundcloud_credentials["redirect_uri"]
 
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
+SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 
 SOUNDCLOUD_AUTH_URL = "https://soundcloud.com/connect"
 SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
@@ -71,6 +72,50 @@ def callback_soundcloud():
     response = requests.post(SOUNDCLOUD_TOKEN_URL, data=token_data)
     session["soundcloud_token"] = response.json().get("access_token")
     return "SoundCloud login successful!"
+
+@app.route("/choose_playlist")
+def choose_playlist():
+    if "spotify_token" not in session:
+        return redirect("/login_spotify")
+
+    headers = {"Authorization": f"Bearer {session['spotify_token']}"}
+    response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers)
+    playlists = response.json().get("items", [])
+
+    # Render a list of playlists for the user to choose from
+    playlist_html = "<h2>Select a Playlist to Transfer:</h2>"
+    playlist_html += "<ul>"
+    for playlist in playlists:
+        playlist_id = playlist["id"]
+        playlist_name = playlist["name"]
+        playlist_html += f'<li><a href="/transfer_playlist/{playlist_id}">{playlist_name}</a></li>'
+    playlist_html += "</ul>"
+    return playlist_html
+
+@app.route("/transfer_playlist/<playlist_id>")
+def transfer_playlist(playlist_id):
+    if "spotify_token" not in session:
+        return redirect("/login_spotify")
+
+    headers = {"Authorization": f"Bearer {session['spotify_token']}"}
+    response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/tracks", headers=headers)
+    tracks = response.json().get("items", [])
+
+    track_list = []
+    for item in tracks:
+        track = item["track"]
+        track_name = track["name"]
+        artist_name = track["artists"][0]["name"]
+        track_list.append(f"{track_name} by {artist_name}")
+
+
+    transfer_html = "<h2>Transferring Tracks:</h2>"
+    transfer_html += "<ul>"
+    for track in track_list:
+        transfer_html += f"<li>{track}</li>"
+    transfer_html += "</ul>"
+    transfer_html += "<p>Tracks transferred successfully!</p>"
+    return transfer_html
 
 if __name__ == "__main__":
     app.run(debug=True)

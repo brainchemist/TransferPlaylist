@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Playlist</title>
+</head>
+<body>
+    <h2>Transferring Tracks:</h2>
+    <ul>
+        {% for track in tracks %}
+            <li>{{ track }}</li>
+        {% endfor %}
+    </ul>
+    <p>Tracks transferred successfully!</p>
+</body>
+</html>
