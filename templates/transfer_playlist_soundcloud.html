@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Playlist</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Transferring Tracks for Playlist: "{{ playlist_name }}"</h2>
+
+        {% if success %}
+            <p class="success">Playlist transferred successfully!</p>
+        {% else %}
+            <p class="error">Failed to transfer playlist. Some tracks may not have been found on Spotify.</p>
+        {% endif %}
+
+        <ul class="track-list">
+            {% for track in tracks %}
+                <li class="track-item">
+                    <div class="track-card">
+                        <div class="track-details">
+                            <span class="track-name">{{ track.name }}</span>
+                            <span class="track-artist">{{ track.artist }}</span>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
