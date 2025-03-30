@@ -4,14 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transfer Playlist</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h2>Transferring Tracks:</h2>
-    <ul>
-        {% for track in tracks %}
-            <li>{{ track }}</li>
-        {% endfor %}
-    </ul>
-    <p>Tracks transferred successfully!</p>
+    <div class="container">
+        <h2>Transferring Tracks:</h2>
+        <ul class="track-list">
+            {% for track in tracks %}
+                <li class="track-item">
+                    <div class="track-card">
+                        <img src="{{ track.album_image }}" alt="{{ track.name }} Cover" class="track-cover">
+                        <div class="track-details">
+                            <span class="track-name">{{ track.name }}</span>
+                            <span class="track-artist">{{ track.artist }}</span>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="success">Tracks transferred successfully!</p>
+    </div>
 </body>
 </html>
