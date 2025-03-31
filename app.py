@@ -29,12 +29,12 @@ SOUNDCLOUD_REDIRECT_URI = os.getenv("SOUNDCLOUD_REDIRECT_URI")
 # SOUNDCLOUD_CLIENT_SECRET = soundcloud_credentials["client_secret"]
 # SOUNDCLOUD_REDIRECT_URI = soundcloud_credentials["redirect_uri"]
 #
-# SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
-# SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
+SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
+SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 #
-# SOUNDCLOUD_AUTH_URL = "https://soundcloud.com/connect"
-# SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
+SOUNDCLOUD_AUTH_URL = "https://soundcloud.com/connect"
+SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
 SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
 
 @app.route("/")
