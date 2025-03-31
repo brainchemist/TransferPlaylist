@@ -1,0 +1,6 @@
+# created by virtualenv automatically
+.venv/bin
+.idea/
+soundcloud_credentials.json
+spotify_credentials.json
+.venv

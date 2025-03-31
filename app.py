@@ -75,7 +75,7 @@ def login_soundcloud():
     )
     return redirect(auth_url)
 
-@app.route("/callback_soundcloud")
+@app.route("/callback")
 def callback_soundcloud():
     code = request.args.get("code")
     token_data = {
