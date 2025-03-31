@@ -46,7 +46,7 @@ def login_spotify():
     auth_url = (
         f"{SPOTIFY_AUTH_URL}?client_id={SPOTIFY_CLIENT_ID}"
         "&response_type=code"
-        "&redirect_uri=http://localhost:5000/callback_spotify"
+        "&redirect_uri=https://transferplaylist-2nob.onrender.com/callback_spotify"
         "&scope=playlist-read-private playlist-modify-private"
     )
     return redirect(auth_url)
