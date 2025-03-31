@@ -1,3 +1,4 @@
+import base64
 import os
 
 from flask import Flask, redirect, request, session, render_template
@@ -107,7 +108,11 @@ def transfer_playlist(playlist_id):
 
     headers = {"Authorization": f"Bearer {session['spotify_token']}"}
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/tracks", headers=headers)
+    playlist_data = response.json()
+    playlist_name = playlist_data.get("title", "Transferred Playlist")
+    playlist_description = playlist_data.get("description", "")
     tracks_data = response.json().get("items", [])
+    playlist_artwork_url = playlist_data.get("artwork_url")
 
     track_list = []
     soundcloud_track_ids = []
@@ -141,8 +146,9 @@ def transfer_playlist(playlist_id):
     if soundcloud_track_ids:
         soundcloud_playlist_data = {
             "playlist": {
-                "title": "Transferred Playlist",
+                "name": playlist_name,
                 "sharing": "public",
+                "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
                 "tracks": [{"id": track_id} for track_id in soundcloud_track_ids]
             }
         }
@@ -155,7 +161,28 @@ def transfer_playlist(playlist_id):
         if response.status_code == 201:
             success = True
 
-    # Render the HTML template with the results
+        if playlist_artwork_url:
+            try:
+                # Fetch the image from SoundCloud
+                image_response = requests.get(playlist_artwork_url)
+                if image_response.status_code == 200:
+                    # Encode the image in Base64
+                    image_base64 = base64.b64encode(image_response.content).decode("utf-8")
+
+                    # Upload the image to Spotify
+                    upload_image_response = requests.put(
+                        f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/images",
+                        headers={
+                            "Authorization": f"Bearer {session.get('spotify_token')}",
+                            "Content-Type": "image/jpeg"
+                        },
+                        data=image_base64
+                    )
+                    if upload_image_response.status_code != 202:
+                        print(f"Failed to upload playlist cover image: {upload_image_response.text}")
+            except Exception as e:
+                print(f"Error uploading playlist cover image: {e}")
+
     return render_template(
         "transfer_playlist_spotify.html",
         playlist_name="Transferred Playlist",
