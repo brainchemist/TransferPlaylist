@@ -12,7 +12,7 @@
         <ul class="playlist-list">
             {% for playlist in playlists %}
                 <li class="playlist-item">
-                    <a href="/transfer_playlist/{{ playlist.id }}" class="playlist-link">
+                    <a href="/transfer_playlist_spotify/{{ playlist.id }}" class="playlist-link">
                         <img src="{{ playlist.images[0].url if playlist.images else '/static/default-cover.jpg' }}" alt="{{ playlist.name }} Cover" class="playlist-cover">
                         <span class="playlist-name">{{ playlist.name }}</span>
                     </a>
