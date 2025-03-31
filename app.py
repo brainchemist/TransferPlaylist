@@ -70,7 +70,7 @@ def login_soundcloud():
     auth_url = (
         f"{SOUNDCLOUD_AUTH_URL}?client_id={SOUNDCLOUD_CLIENT_ID}"
         "&response_type=code"
-        "&redirect_uri=http://localhost:5000/callback_soundcloud"
+        "&redirect_uri=https://transferplaylist-2nob.onrender.com/callback"
         "&scope=non-expiring"
     )
     return redirect(auth_url)
