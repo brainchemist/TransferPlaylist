@@ -1,4 +1,3 @@
-import base64
 import os
 
 from flask import Flask, redirect, request, session, render_template
@@ -38,9 +37,11 @@ SOUNDCLOUD_AUTH_URL = "https://soundcloud.com/connect"
 SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
 SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/login_spotify")
 def login_spotify():
@@ -51,6 +52,7 @@ def login_spotify():
         "&scope=playlist-read-private playlist-modify-private"
     )
     return redirect(auth_url)
+
 
 @app.route("/callback_spotify")
 def callback_spotify():
@@ -66,6 +68,7 @@ def callback_spotify():
     session["spotify_token"] = response.json().get("access_token")
     return redirect("/choose_playlist")
 
+
 @app.route("/login_soundcloud")
 def login_soundcloud():
     auth_url = (
@@ -75,6 +78,7 @@ def login_soundcloud():
         "&scope=non-expiring"
     )
     return redirect(auth_url)
+
 
 @app.route("/callback")
 def callback_soundcloud():
@@ -90,6 +94,7 @@ def callback_soundcloud():
     session["soundcloud_token"] = response.json().get("access_token")
     return redirect("/choose_playlist_soundcloud")
 
+
 @app.route("/choose_playlist")
 def choose_playlist():
     if not session.get("spotify_token"):
@@ -100,6 +105,7 @@ def choose_playlist():
     playlists = response.json().get("items", [])
 
     return render_template("choose_playlist_spotify.html", playlists=playlists)
+
 
 @app.route("/transfer_playlist_spotify/<playlist_id>")
 def transfer_playlist(playlist_id):
@@ -112,7 +118,6 @@ def transfer_playlist(playlist_id):
     playlist_name = playlist_data.get("title", "Transferred Playlist")
     playlist_description = playlist_data.get("description", "")
     tracks_data = response.json().get("items", [])
-    playlist_artwork_url = playlist_data.get("artwork_url")
 
     track_list = []
     soundcloud_track_ids = []
@@ -161,34 +166,14 @@ def transfer_playlist(playlist_id):
         if response.status_code == 201:
             success = True
 
-        if playlist_artwork_url:
-            try:
-                # Fetch the image from SoundCloud
-                image_response = requests.get(playlist_artwork_url)
-                if image_response.status_code == 200:
-                    # Encode the image in Base64
-                    image_base64 = base64.b64encode(image_response.content).decode("utf-8")
-
-                    # Upload the image to Spotify
-                    upload_image_response = requests.put(
-                        f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/images",
-                        headers={
-                            "Authorization": f"Bearer {session.get('spotify_token')}",
-                            "Content-Type": "image/jpeg"
-                        },
-                        data=image_base64
-                    )
-                    if upload_image_response.status_code != 202:
-                        print(f"Failed to upload playlist cover image: {upload_image_response.text}")
-            except Exception as e:
-                print(f"Error uploading playlist cover image: {e}")
-
+    # Render the HTML template with the results
     return render_template(
         "transfer_playlist_spotify.html",
         playlist_name="Transferred Playlist",
         tracks=track_list,
         success=success
     )
+
 
 @app.route("/choose_playlist_soundcloud")
 def choose_playlist_soundcloud():
@@ -200,6 +185,7 @@ def choose_playlist_soundcloud():
     playlists = response.json()
 
     return render_template("choose_playlist_soundcloud.html", playlists=playlists)
+
 
 @app.route("/transfer_playlist_soundcloud/<playlist_id>")
 def transfer_playlist_soundcloud(playlist_id):
@@ -264,6 +250,7 @@ def transfer_playlist_soundcloud(playlist_id):
         tracks=track_list,
         success=success
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
