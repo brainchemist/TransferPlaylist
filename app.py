@@ -1,3 +1,4 @@
+import logging
 import os
 from flask import Flask, redirect, request, session, render_template
 import requests
@@ -135,6 +136,9 @@ def transfer_playlist_spotify(playlist_id):
         )
         soundcloud_tracks = soundcloud_response.json()
 
+        logging.info(f"SoundCloud Search Query: {query}")
+        logging.info(f"SoundCloud API Response: {soundcloud_tracks}")
+
         if soundcloud_tracks:
             try:
                 soundcloud_track_ids.append(soundcloud_tracks[0]["id"])
@@ -159,6 +163,10 @@ def transfer_playlist_spotify(playlist_id):
             headers=headers,
             json=soundcloud_playlist_data
         )
+
+        print(f"SoundCloud API Response: {response.status_code}")
+        print(f"Response Body: {response.text}")
+
         if response.status_code == 201:
             success = True
 
