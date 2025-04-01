@@ -2,6 +2,7 @@ import logging
 import os
 from flask import Flask, redirect, request, session, render_template
 import requests
+from fuzzywuzzy import fuzz
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -118,6 +119,8 @@ def transfer_playlist_spotify(playlist_id):
 
     track_list = []
     soundcloud_track_ids = []
+    unmatched_tracks = []
+
     for item in tracks_data:
         track = item["track"]
         track_name = track["name"]
@@ -129,53 +132,91 @@ def transfer_playlist_spotify(playlist_id):
             "album_image": album_image
         })
 
-        query = f"{track_name} {artist_name}"
-        soundcloud_response = requests.get(
-            f"{SOUNDCLOUD_API_BASE_URL}/tracks",
-            params={"q": query, "client_id": SOUNDCLOUD_CLIENT_ID}
-        )
-        soundcloud_tracks = soundcloud_response.json()
+        # Construct and test multiple queries
+        fallback_queries = [
+            f"{track_name} {artist_name}",
+            f"{track_name}",
+            f"{track_name} {artist_name.split(' ')[0]}"
+        ]
+        soundcloud_tracks = []
+        for query in fallback_queries:
+            query = query.replace("feat.", "").replace("(", "").replace(")", "").lower()
+            soundcloud_response = requests.get(
+                f"{SOUNDCLOUD_API_BASE_URL}/tracks",
+                params={"q": query, "client_id": SOUNDCLOUD_CLIENT_ID}
+            )
+            logging.info(f"SoundCloud Search Query: {query}")
+            logging.info(f"SoundCloud API Raw Response: {soundcloud_response.text}")
 
-        logging.info(f"SoundCloud Search Query: {query}")
-        logging.info(f"SoundCloud API Response: {soundcloud_tracks}")
+            try:
+                soundcloud_tracks = soundcloud_response.json()
+                if soundcloud_tracks:
+                    break
+            except ValueError:
+                logging.error("Invalid JSON response from SoundCloud API.")
 
         if soundcloud_tracks:
-            try:
-                soundcloud_track_ids.append(soundcloud_tracks[0]["id"])
-            except (IndexError, KeyError):
-                print(f"No match found for track: {track_name} by {artist_name}")
+            best_match = find_best_match(track_name, artist_name, soundcloud_tracks)
+            if best_match:
+                soundcloud_track_ids.append(best_match["id"])
+            else:
+                unmatched_tracks.append(f"No match found for track: {track_name} by {artist_name}")
         else:
-            print(f"No match found for track: {track_name} by {artist_name}")
+            unmatched_tracks.append(f"No results found for query: {query}")
 
-    success = False
-    if soundcloud_track_ids:
-        soundcloud_playlist_data = {
-            "playlist": {
-                "title": playlist_name,
-                "sharing": "public",
-                "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
-                "tracks": [{"id": track_id} for track_id in soundcloud_track_ids]
-            }
-        }
-        headers = {"Authorization": f"OAuth {session.get('soundcloud_token')}"}
-        response = requests.post(
-            f"{SOUNDCLOUD_API_BASE_URL}/playlists",
-            headers=headers,
-            json=soundcloud_playlist_data
+    logging.warning("\n".join(unmatched_tracks))
+
+    if not soundcloud_track_ids:
+        return render_template(
+            "transfer_playlist_spotify.html",
+            playlist_name=playlist_name,
+            tracks=track_list,
+            success=False,
+            message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
 
-        print(f"SoundCloud API Response: {response.status_code}")
-        print(f"Response Body: {response.text}")
+    soundcloud_playlist_data = {
+        "playlist": {
+            "title": playlist_name,
+            "sharing": "public",
+            "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
+            "tracks": [{"id": track_id} for track_id in soundcloud_track_ids]
+        }
+    }
 
-        if response.status_code == 201:
-            success = True
+    headers = {"Authorization": f"OAuth {session.get('soundcloud_token')}"}
+    response = requests.post(
+        f"{SOUNDCLOUD_API_BASE_URL}/playlists",
+        headers=headers,
+        json=soundcloud_playlist_data
+    )
+
+    logging.info(f"SoundCloud API Response: {response.status_code}")
+    logging.info(f"Response Body: {response.text}")
+
+    success = response.status_code == 201
 
     return render_template(
         "transfer_playlist_spotify.html",
         playlist_name=playlist_name,
         tracks=track_list,
-        success=success
+        success=success,
+        message="Playlist created successfully!" if success else "Failed to create playlist on SoundCloud."
     )
+
+
+def find_best_match(track_name, artist_name, soundcloud_tracks):
+    """Find the best matching track using fuzzy matching."""
+    best_match = None
+    highest_score = 0
+    for track in soundcloud_tracks:
+        title_score = fuzz.ratio(track["title"].lower(), track_name.lower())
+        artist_score = fuzz.ratio(track.get("user", {}).get("username", "").lower(), artist_name.lower())
+        total_score = (title_score + artist_score) / 2
+        if total_score > highest_score:
+            highest_score = total_score
+            best_match = track
+    return best_match if highest_score > 70 else None  # Adjust threshold as needed
 
 
 @app.route("/choose_playlist_soundcloud")
