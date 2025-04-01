@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from flask import Flask, redirect, request, session, render_template
@@ -7,13 +8,27 @@ from fuzzywuzzy import fuzz
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
+# SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+# SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+# SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
+#
+# SOUNDCLOUD_CLIENT_ID = os.getenv("SOUNDCLOUD_CLIENT_ID")
+# SOUNDCLOUD_CLIENT_SECRET = os.getenv("SOUNDCLOUD_CLIENT_SECRET")
+# SOUNDCLOUD_REDIRECT_URI = os.getenv("SOUNDCLOUD_REDIRECT_URI")
 
-SOUNDCLOUD_CLIENT_ID = os.getenv("SOUNDCLOUD_CLIENT_ID")
-SOUNDCLOUD_CLIENT_SECRET = os.getenv("SOUNDCLOUD_CLIENT_SECRET")
-SOUNDCLOUD_REDIRECT_URI = os.getenv("SOUNDCLOUD_REDIRECT_URI")
+with open("spotify_credentials.json", "r") as spotify_file:
+    spotify_credentials = json.load(spotify_file)
+
+SPOTIFY_CLIENT_ID = spotify_credentials["client_id"]
+SPOTIFY_CLIENT_SECRET = spotify_credentials["client_secret"]
+SPOTIFY_REDIRECT_URI = spotify_credentials["redirect_uri"]
+
+with open("soundcloud_credentials.json", "r") as soundcloud_file:
+    soundcloud_credentials = json.load(soundcloud_file)
+
+SOUNDCLOUD_CLIENT_ID = soundcloud_credentials["client_id"]
+SOUNDCLOUD_CLIENT_SECRET = soundcloud_credentials["client_secret"]
+SOUNDCLOUD_REDIRECT_URI = soundcloud_credentials["redirect_uri"]
 
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
