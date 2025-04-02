@@ -150,8 +150,17 @@ def transfer_playlist_spotify(playlist_id):
 
             try:
                 soundcloud_tracks = soundcloud_response.json()
-                if soundcloud_tracks:
-                    break
+
+                if isinstance(soundcloud_tracks, list):
+                    # Ensure each item is a dictionary
+                    if all(isinstance(track, dict) for track in soundcloud_tracks):
+                        break
+                    else:
+                        logging.error("Unexpected track format: Not all items are dictionaries.")
+                elif isinstance(soundcloud_tracks, dict) and "errors" in soundcloud_tracks:
+                    logging.error(f"SoundCloud API Error: {soundcloud_tracks['errors']}")
+                else:
+                    logging.error(f"Unexpected SoundCloud API Response: {soundcloud_tracks}")
             except ValueError:
                 logging.error("Invalid JSON response from SoundCloud API.")
 
@@ -210,14 +219,22 @@ def find_best_match(track_name, artist_name, soundcloud_tracks):
     best_match = None
     highest_score = 0
     for track in soundcloud_tracks:
-        title_score = fuzz.ratio(track["title"].lower(), track_name.lower())
-        artist_score = fuzz.ratio(track.get("user", {}).get("username", "").lower(), artist_name.lower())
+        if not isinstance(track, dict):
+            logging.error(f"Unexpected track format: {track}")
+            continue
+
+        title = track.get("title", "").lower()
+        artist = track.get("user", {}).get("username", "").lower()
+
+        title_score = fuzz.ratio(title, track_name.lower())
+        artist_score = fuzz.ratio(artist, artist_name.lower())
         total_score = (title_score + artist_score) / 2
+
         if total_score > highest_score:
             highest_score = total_score
             best_match = track
-    return best_match if highest_score > 70 else None  # Adjust threshold as needed
 
+    return best_match if highest_score > 70 else None
 
 @app.route("/choose_playlist_soundcloud")
 def choose_playlist_soundcloud():
