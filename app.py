@@ -132,7 +132,6 @@ def transfer_playlist_spotify(playlist_id):
             "album_image": album_image
         })
 
-        # Construct and test multiple queries
         fallback_queries = [
             f"{track_name} {artist_name}",
             f"{track_name}",
@@ -152,7 +151,6 @@ def transfer_playlist_spotify(playlist_id):
                 soundcloud_tracks = soundcloud_response.json()
 
                 if isinstance(soundcloud_tracks, list):
-                    # Ensure each item is a dictionary
                     if all(isinstance(track, dict) for track in soundcloud_tracks):
                         break
                     else:
@@ -234,7 +232,7 @@ def find_best_match(track_name, artist_name, soundcloud_tracks):
             highest_score = total_score
             best_match = track
 
-    return best_match if highest_score > 70 else None
+    return best_match if highest_score > 70 else None  # Adjust threshold as needed
 
 @app.route("/choose_playlist_soundcloud")
 def choose_playlist_soundcloud():
