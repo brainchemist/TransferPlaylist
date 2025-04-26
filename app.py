@@ -67,6 +67,7 @@ def login_soundcloud():
 def callback_soundcloud():
     code = request.args.get("code")
     if not code:
+        logging.error("Authorization failed. No code received.")
         return "Authorization failed. No code received.", 400
     token_data = {
         "client_id": SOUNDCLOUD_CLIENT_ID,
@@ -77,6 +78,7 @@ def callback_soundcloud():
     }
     response = requests.post(SOUNDCLOUD_TOKEN_URL, data=token_data)
     if response.status_code != 200:
+        logging.error(f"Failed to retrieve access token. Error: {response.text}")
         return f"Failed to retrieve access token. Error: {response.text}", 500
     session["soundcloud_token"] = response.json().get("access_token")
     return redirect("/choose_playlist_soundcloud")
@@ -95,16 +97,28 @@ def transfer_playlist_spotify(playlist_id):
     if not session.get("spotify_token"):
         return redirect("/login_spotify")
     if not session.get("soundcloud_token"):
+        logging.warning("User is not logged into SoundCloud. Redirecting to login.")
         return redirect("/login_soundcloud")
+
     headers = {"Authorization": f"Bearer {session['spotify_token']}"}
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
+    if response.status_code != 200:
+        logging.error(f"Failed to fetch Spotify playlist. Status Code: {response.status_code}, Response: {response.text}")
+        return render_template(
+            "transfer_playlist_spotify.html",
+            playlist_name="Unknown Playlist",
+            tracks=[],
+            success=False,
+            message="Failed to fetch playlist from Spotify. Please try again."
+        )
+
     playlist_data = response.json()
     playlist_name = playlist_data.get("name", "Transferred Playlist")
     playlist_description = playlist_data.get("description", "")
     tracks_data = playlist_data.get("tracks", {}).get("items", [])
     track_list = []
     soundcloud_track_ids = []
-    unmatched_tracks = []
+
     for item in tracks_data:
         track = item["track"]
         track_name = track["name"]
@@ -115,44 +129,44 @@ def transfer_playlist_spotify(playlist_id):
             "artist": artist_name,
             "album_image": album_image
         })
+
         fallback_queries = [
             f"{track_name} {artist_name}",
             f"{track_name}",
             f"{track_name} {artist_name.split(' ')[0]}"
         ]
+
         soundcloud_tracks = []
         for query in fallback_queries:
             query = query.replace("feat.", "").replace("(", "").replace(")", "").lower()
-            try:
-                headers_soundcloud = {"Authorization": f"OAuth {session.get('soundcloud_token')}"}
-                soundcloud_response = requests.get(
-                    f"{SOUNDCLOUD_API_BASE_URL}/tracks",
-                    headers=headers_soundcloud,
-                    params={"q": query, "client_id": SOUNDCLOUD_CLIENT_ID}
-                )
-                logging.info(f"SoundCloud Search Query: {query}")
-                logging.info(f"SoundCloud API Raw Response: {soundcloud_response.text}")
-                soundcloud_tracks = soundcloud_response.json()
-                if isinstance(soundcloud_tracks, list):
-                    if all(isinstance(track, dict) for track in soundcloud_tracks):
-                        break
+            soundcloud_response = requests.get(
+                f"{SOUNDCLOUD_API_BASE_URL}/tracks",
+                params={"q": query, "client_id": SOUNDCLOUD_CLIENT_ID}
+            )
+            logging.info(f"SoundCloud Search Query: {query}")
+            logging.info(f"SoundCloud API Raw Response: {soundcloud_response.text}")
+
+            if soundcloud_response.status_code == 200:
+                try:
+                    soundcloud_tracks = soundcloud_response.json()
+                    if isinstance(soundcloud_tracks, list) and soundcloud_tracks:
+                        break  # Valid track list found
                     else:
-                        logging.error("Unexpected track format: Not all items are dictionaries.")
-                elif isinstance(soundcloud_tracks, dict) and "errors" in soundcloud_tracks:
-                    logging.error(f"SoundCloud API Error: {soundcloud_tracks['errors']}")
-                else:
-                    logging.error(f"Unexpected SoundCloud API Response: {soundcloud_tracks}")
-            except ValueError:
-                logging.error("Invalid JSON response from SoundCloud API.")
+                        logging.error("Unexpected track format or no tracks found.")
+                except ValueError:
+                    logging.error("Invalid JSON response from SoundCloud API.")
+            else:
+                logging.error(f"SoundCloud API Error: {soundcloud_response.status_code}, {soundcloud_response.text}")
+
         if soundcloud_tracks:
             best_match = find_best_match(track_name, artist_name, soundcloud_tracks)
             if best_match:
                 soundcloud_track_ids.append(best_match["id"])
             else:
-                unmatched_tracks.append(f"No match found for track: {track_name} by {artist_name}")
+                logging.warning(f"No match found for track: {track_name} by {artist_name}")
         else:
-            unmatched_tracks.append(f"No results found for query: {query}")
-    logging.warning("\n".join(unmatched_tracks))
+            logging.warning(f"No results found for query: {query}")
+
     if not soundcloud_track_ids:
         return render_template(
             "transfer_playlist_spotify.html",
@@ -161,6 +175,7 @@ def transfer_playlist_spotify(playlist_id):
             success=False,
             message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
+
     soundcloud_playlist_data = {
         "playlist": {
             "title": playlist_name,
@@ -169,21 +184,30 @@ def transfer_playlist_spotify(playlist_id):
             "tracks": [{"id": track_id} for track_id in soundcloud_track_ids]
         }
     }
+
     headers = {"Authorization": f"OAuth {session.get('soundcloud_token')}"}
     response = requests.post(
         f"{SOUNDCLOUD_API_BASE_URL}/playlists",
         headers=headers,
         json=soundcloud_playlist_data
     )
-    logging.info(f"SoundCloud API Response: {response.status_code}")
-    logging.info(f"Response Body: {response.text}")
-    success = response.status_code == 201
+
+    if response.status_code != 201:
+        logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
+        return render_template(
+            "transfer_playlist_spotify.html",
+            playlist_name=playlist_name,
+            tracks=track_list,
+            success=False,
+            message="Failed to create playlist on SoundCloud. Please try again."
+        )
+
     return render_template(
         "transfer_playlist_spotify.html",
         playlist_name=playlist_name,
         tracks=track_list,
-        success=success,
-        message="Playlist created successfully!" if success else "Failed to create playlist on SoundCloud."
+        success=True,
+        message="Playlist created successfully!"
     )
 
 def find_best_match(track_name, artist_name, soundcloud_tracks):
@@ -191,6 +215,7 @@ def find_best_match(track_name, artist_name, soundcloud_tracks):
     highest_score = 0
     for track in soundcloud_tracks:
         if not isinstance(track, dict):
+            logging.error(f"Unexpected track format: {track}")
             continue
         title = track.get("title", "").lower()
         artist = track.get("user", {}).get("username", "").lower()
