@@ -1,3 +1,4 @@
+import re
 import logging
 import os
 import io
@@ -149,10 +150,11 @@ def transfer_playlist_spotify(playlist_id):
         })
 
         fallback_queries = [
-            f"{track_name} {artist_name}",
-            f"{track_name}",
-            f"{track_name} {artist_name.split(' ')[0]}"
+            clean_track_query(track_name, artist_name),
+            (track_name, ""),
+            (track_name, artist_name.split(' ')[0])
         ]
+
 
         soundcloud_tracks = []
         for query in fallback_queries:
