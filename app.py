@@ -217,8 +217,27 @@ def transfer_playlist_spotify(playlist_id):
         "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
     }
 
+    files_list = [
+        ("playlist[title]", (None, playlist_name)),
+        ("playlist[sharing]", (None, "public")),
+        ("playlist[description]", (None,
+                                   f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com")),
+    ]
+
+    # Append all track IDs correctly
     for track_id in soundcloud_track_ids:
-        files.setdefault("playlist[tracks][][id]", []).append((None, str(track_id)))
+        files_list.append(("playlist[tracks][][id]", (None, str(track_id))))
+
+    # Append image if available
+    if image_data:
+        files_list.append(("playlist[artwork_data]", ("cover.jpg", image_data, "image/jpeg")))
+
+    # Make the POST request with flat list of tuples
+    response = requests.post(
+        f"{SOUNDCLOUD_API_BASE_URL}/playlists",
+        headers={"Authorization": f"OAuth {session['soundcloud_token']}"},
+        files=files_list
+    )
 
     if image_data:
         files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
