@@ -150,8 +150,10 @@ def transfer_playlist_spotify(playlist_id):
             query = query.replace("feat.", "").replace("(", "").replace(")", "").lower()
             soundcloud_response = requests.get(
                 f"{SOUNDCLOUD_API_BASE_URL}/tracks",
-                params={"q": query, "client_id": SOUNDCLOUD_CLIENT_ID}
+                headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
+                params={"q": query}
             )
+
             logging.info(f"SoundCloud Search Query: {query}")
             logging.info(f"SoundCloud API Raw Response: {soundcloud_response.text}")
 
