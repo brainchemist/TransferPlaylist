@@ -55,10 +55,12 @@ def callback_spotify():
 
 @app.route("/login_soundcloud")
 def login_soundcloud():
+    # Save the page user was on
+    session["post_soundcloud_redirect"] = request.referrer or "/"
     auth_url = (
         f"{SOUNDCLOUD_AUTH_URL}?client_id={SOUNDCLOUD_CLIENT_ID}"
         "&response_type=code"
-        "&redirect_uri=https://transferplaylist-2nob.onrender.com/callback"
+        f"&redirect_uri={SOUNDCLOUD_REDIRECT_URI}"
         "&scope=non-expiring"
     )
     return redirect(auth_url)
