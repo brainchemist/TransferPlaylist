@@ -217,8 +217,8 @@ def transfer_playlist_spotify(playlist_id):
         "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
     }
 
-    for idx, track_id in enumerate(soundcloud_track_ids):
-        files[f"playlist[tracks][{idx}][id]"] = (None, str(track_id))
+    for track_id in soundcloud_track_ids:
+        files.setdefault("playlist[tracks][][id]", []).append((None, str(track_id)))
 
     if image_data:
         files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
