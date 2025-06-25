@@ -236,7 +236,7 @@ def find_best_match(track_name, artist_name, soundcloud_tracks):
         if total_score > highest_score:
             highest_score = total_score
             best_match = track
-    return best_match if highest_score > 70 else None
+    return best_match if highest_score > 60 else None
 
 @app.route("/choose_playlist_soundcloud")
 def choose_playlist_soundcloud():
