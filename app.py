@@ -26,37 +26,30 @@ SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
 def find_best_match(track_name, artist_name, soundcloud_tracks):
     best_match = None
     highest_score = 0
-    logging.info(f"Trying to match: {track_name} by {artist_name}")
-
     for track in soundcloud_tracks:
         if not isinstance(track, dict):
-            logging.warning(f"Skipping non-dict track: {track}")
+            logging.error(f"Unexpected track format: {track}")
             continue
-
         title = track.get("title", "").lower()
         artist = track.get("user", {}).get("username", "").lower()
         title_score = fuzz.ratio(title, track_name.lower())
         artist_score = fuzz.ratio(artist, artist_name.lower())
         total_score = (title_score + artist_score) / 2
 
-        logging.info(f"Candidate: '{title}' by '{artist}' | Title Score: {title_score}, Artist Score: {artist_score}, Total: {total_score}")
+        logging.info(f"Evaluating match: '{title}' by '{artist}' | Score: {total_score}")
 
         if total_score > highest_score:
             highest_score = total_score
             best_match = track
 
-    if best_match:
-        logging.info(f"✅ Best match: {best_match['title']} by {best_match['user']['username']} (score: {highest_score})")
-    else:
-        logging.warning("❌ No acceptable match found.")
+    logging.info(f"Best match score for '{track_name}': {highest_score}")
 
-    return best_match if highest_score > 65 else None
+    return best_match if highest_score > 50 else None
 
 def clean_track_query(title, artist):
     title = re.sub(r"\(.*?\)|\[.*?\]|- .*", "", title)
     title = title.replace("feat.", "").replace("ft.", "").lower()
-    artist = artist.split()[0].lower()
-    return f"{title.strip()} {artist.strip()}"
+    return f"{title.strip()} {artist.lower().strip()}"
 
 @app.route("/")
 def index():
@@ -164,7 +157,7 @@ def transfer_playlist_spotify(playlist_id):
         fallback_queries = [
             clean_track_query(track_name, artist_name),
             track_name.lower(),
-            f"{track_name} {artist_name.split(' ')[0]}".lower()
+            f"{track_name} {artist_name}".lower()
         ]
 
         token = session.get("soundcloud_token")
@@ -190,8 +183,6 @@ def transfer_playlist_spotify(playlist_id):
                 try:
                     soundcloud_tracks = soundcloud_response.json()
                     if isinstance(soundcloud_tracks, list) and soundcloud_tracks:
-                        logging.info(
-                            f"Raw SoundCloud candidates: {[t['title'] for t in soundcloud_tracks if isinstance(t, dict)]}")
                         break
                     else:
                         logging.warning("No valid tracks returned in this query.")
