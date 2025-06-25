@@ -71,6 +71,7 @@ def callback_soundcloud():
     if not code:
         logging.error("Authorization failed. No code received.")
         return "Authorization failed. No code received.", 400
+
     token_data = {
         "client_id": SOUNDCLOUD_CLIENT_ID,
         "client_secret": SOUNDCLOUD_CLIENT_SECRET,
@@ -82,8 +83,12 @@ def callback_soundcloud():
     if response.status_code != 200:
         logging.error(f"Failed to retrieve access token. Error: {response.text}")
         return f"Failed to retrieve access token. Error: {response.text}", 500
+
     session["soundcloud_token"] = response.json().get("access_token")
-    return redirect("/choose_playlist_soundcloud")
+
+    # Go back to the original action if present
+    return redirect(session.pop("post_soundcloud_redirect", "/choose_playlist_soundcloud"))
+
 
 @app.route("/choose_playlist")
 def choose_playlist():
