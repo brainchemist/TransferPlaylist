@@ -111,10 +111,12 @@ def choose_playlist():
 def transfer_playlist_spotify(playlist_id):
     if not session.get("spotify_token"):
         return redirect("/login_spotify")
+
     if not session.get("soundcloud_token"):
         logging.warning("User is not logged into SoundCloud. Redirecting to login.")
         return redirect("/login_soundcloud")
 
+    # Fetch Spotify playlist
     headers = {"Authorization": f"Bearer {session['spotify_token']}"}
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
     if response.status_code != 200:
@@ -134,6 +136,7 @@ def transfer_playlist_spotify(playlist_id):
     track_list = []
     soundcloud_track_ids = []
 
+    # Search tracks on SoundCloud
     for item in tracks_data:
         track = item["track"]
         track_name = track["name"]
@@ -154,9 +157,16 @@ def transfer_playlist_spotify(playlist_id):
         soundcloud_tracks = []
         for query in fallback_queries:
             query = query.replace("feat.", "").replace("(", "").replace(")", "").lower()
+
+            # ✅ Validate token exists before calling
+            token = session.get("soundcloud_token")
+            if not token:
+                logging.error("Missing or expired SoundCloud token.")
+                return redirect("/login_soundcloud")
+
             soundcloud_response = requests.get(
                 f"{SOUNDCLOUD_API_BASE_URL}/tracks",
-                headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
+                headers={"Authorization": f"OAuth {token}"},
                 params={"q": query}
             )
 
@@ -167,7 +177,7 @@ def transfer_playlist_spotify(playlist_id):
                 try:
                     soundcloud_tracks = soundcloud_response.json()
                     if isinstance(soundcloud_tracks, list) and soundcloud_tracks:
-                        break  # Valid track list found
+                        break
                     else:
                         logging.error("Unexpected track format or no tracks found.")
                 except ValueError:
@@ -193,48 +203,33 @@ def transfer_playlist_spotify(playlist_id):
             message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
 
-    if not soundcloud_track_ids:
-        return render_template(
-            "transfer_playlist_spotify.html",
-            playlist_name=playlist_name,
-            tracks=track_list,
-            success=False,
-            message="No matching tracks found on SoundCloud. Some tracks may not be available."
-        )
-        
-# Get Spotify playlist image URL (use first image)
+    # ✅ Download Spotify playlist image
     image_url = playlist_data.get("images", [{}])[0].get("url")
-    
-    # Download the image
     image_data = None
     if image_url:
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
             image_data = io.BytesIO(image_response.content)
-            image_data.name = "cover.jpg"  # Required for requests
-    
-    # Build multipart form data
+            image_data.name = "cover.jpg"
+
+    # ✅ Prepare multipart form data for SoundCloud playlist creation
     files = {
         "playlist[title]": (None, playlist_name),
         "playlist[sharing]": (None, "public"),
         "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
     }
-    
-    # Add tracks
+
     for idx, track_id in enumerate(soundcloud_track_ids):
         files[f"playlist[tracks][{idx}][id]"] = (None, str(track_id))
-    
-    # Add image 
+
     if image_data:
         files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
-    
-    # POST to SoundCloud
+
     response = requests.post(
         f"{SOUNDCLOUD_API_BASE_URL}/playlists",
-        headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
+        headers={"Authorization": f"OAuth {session['soundcloud_token']}"},
         files=files
     )
-
 
     if response.status_code != 201:
         logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
@@ -253,6 +248,7 @@ def transfer_playlist_spotify(playlist_id):
         success=True,
         message="Playlist created successfully!"
     )
+
 
 def find_best_match(track_name, artist_name, soundcloud_tracks):
     best_match = None
