@@ -205,11 +205,18 @@ def transfer_playlist_spotify(playlist_id):
 
     image_url = playlist_data.get("images", [{}])[0].get("url")
     image_data = None
+    valid_image = False
+
     if image_url:
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
-            image_data = io.BytesIO(image_response.content)
-            image_data.name = "cover.jpg"
+            content_type = image_response.headers.get("Content-Type", "")
+            if "jpeg" in content_type or image_url.lower().endswith(".jpg"):
+                raw_image = image_response.content
+                if len(raw_image) < 2 * 1024 * 1024:
+                    image_data = io.BytesIO(raw_image)
+                    image_data.name = "cover.jpg"
+                    valid_image = True
 
     files = {
         "playlist[title]": (None, playlist_name),
@@ -239,8 +246,11 @@ def transfer_playlist_spotify(playlist_id):
         files=files_list
     )
 
-    if image_data:
+    if valid_image and image_data:
         files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
+    else:
+        logging.warning("Skipping image upload due to invalid image format or size.")
+
 
     response = requests.post(
         f"{SOUNDCLOUD_API_BASE_URL}/playlists",
