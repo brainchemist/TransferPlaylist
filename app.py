@@ -35,6 +35,11 @@ def login_spotify():
         "&scope=playlist-read-private playlist-modify-private"
     )
     return redirect(auth_url)
+def clean_track_query(title, artist):
+    title = re.sub(r"\(.*?\)|\[.*?\]|- .*", "", title)  # Remove parentheses/brackets and dashes
+    title = title.replace("feat.", "").replace("ft.", "").lower()
+    artist = artist.split()[0].lower()  # Just first word of artist name
+    return f"{title.strip()} {artist.strip()}"
 
 @app.route("/callback_spotify")
 def callback_spotify():
@@ -187,39 +192,56 @@ def transfer_playlist_spotify(playlist_id):
             success=False,
             message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
-        
-        # Get Spotify playlist image URL (use first image)
-        image_url = playlist_data.get("images", [{}])[0].get("url")
-        
-        # Download the image
-        image_data = None
-        if image_url:
-            image_response = requests.get(image_url)
-            if image_response.status_code == 200:
-                image_data = io.BytesIO(image_response.content)
-                image_data.name = "cover.jpg"  # Required for requests
-        
-        # Build multipart form data
-        files = {
-            "playlist[title]": (None, playlist_name),
-            "playlist[sharing]": (None, "public"),
-            "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
-        }
-        
-        # Add tracks
-        for idx, track_id in enumerate(soundcloud_track_ids):
-            files[f"playlist[tracks][{idx}][id]"] = (None, str(track_id))
-        
-        # Add image 
-        if image_data:
-            files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
-        
-        # POST to SoundCloud
-        response = requests.post(
-            f"{SOUNDCLOUD_API_BASE_URL}/playlists",
-            headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
-            files=files
+
+    if not soundcloud_track_ids:
+        return render_template(
+            "transfer_playlist_spotify.html",
+            playlist_name=playlist_name,
+            tracks=track_list,
+            success=False,
+            message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
+        
+# Get Spotify playlist image URL (use first image)
+    image_url = playlist_data.get("images", [{}])[0].get("url")
+    
+    # Download the image
+    image_data = None
+    if image_url:
+        image_response = requests.get(image_url)
+        if image_response.status_code == 200:
+            image_data = io.BytesIO(image_response.content)
+            image_data.name = "cover.jpg"  # Required for requests
+    
+    # Build multipart form data
+    files = {
+        "playlist[title]": (None, playlist_name),
+        "playlist[sharing]": (None, "public"),
+        "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
+    }
+    
+    # Add tracks
+    for idx, track_id in enumerate(soundcloud_track_ids):
+        files[f"playlist[tracks][{idx}][id]"] = (None, str(track_id))
+    
+    # Add image 
+    if image_data:
+        files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
+    
+    # POST to SoundCloud
+    response = requests.post(
+        f"{SOUNDCLOUD_API_BASE_URL}/playlists",
+        headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
+        files=files
+    )
+
+
+    if response.status_code != 201:
+        logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
+        return render_template(
+            "transfer_playlist_spotify.html",
+            playlist_name=playlist_name,
+            tracks=track_list,
 
 
     if response.status_code != 201:
@@ -255,7 +277,7 @@ def find_best_match(track_name, artist_name, soundcloud_tracks):
         if total_score > highest_score:
             highest_score = total_score
             best_match = track
-    return best_match if highest_score > 60 else None
+    return best_match if highest_score > 80 else None
 
 @app.route("/choose_playlist_soundcloud")
 def choose_playlist_soundcloud():
