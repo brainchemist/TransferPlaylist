@@ -85,6 +85,8 @@ def callback_soundcloud():
         return f"Failed to retrieve access token. Error: {response.text}", 500
 
     session["soundcloud_token"] = response.json().get("access_token")
+    
+    logging.info(f"Redirecting back to: {session.get('post_soundcloud_redirect')}")
 
     # Go back to the original action if present
     return redirect(session.pop("post_soundcloud_redirect", "/choose_playlist_soundcloud"))
