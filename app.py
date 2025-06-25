@@ -1,5 +1,6 @@
 import logging
 import os
+import io
 from flask import Flask, redirect, request, session, render_template
 import requests
 from fuzzywuzzy import fuzz
@@ -186,8 +187,6 @@ def transfer_playlist_spotify(playlist_id):
             success=False,
             message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
-
-            import io
         
         # Get Spotify playlist image URL (use first image)
         image_url = playlist_data.get("images", [{}])[0].get("url")
