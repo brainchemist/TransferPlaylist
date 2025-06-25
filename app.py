@@ -187,21 +187,41 @@ def transfer_playlist_spotify(playlist_id):
             message="No matching tracks found on SoundCloud. Some tracks may not be available."
         )
 
-    soundcloud_playlist_data = {
-        "playlist": {
-            "title": playlist_name,
-            "sharing": "public",
-            "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
-            "tracks": [{"id": track_id} for track_id in soundcloud_track_ids]
+            import io
+        
+        # Get Spotify playlist image URL (use first image)
+        image_url = playlist_data.get("images", [{}])[0].get("url")
+        
+        # Download the image
+        image_data = None
+        if image_url:
+            image_response = requests.get(image_url)
+            if image_response.status_code == 200:
+                image_data = io.BytesIO(image_response.content)
+                image_data.name = "cover.jpg"  # Required for requests
+        
+        # Build multipart form data
+        files = {
+            "playlist[title]": (None, playlist_name),
+            "playlist[sharing]": (None, "public"),
+            "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
         }
-    }
+        
+        # Add tracks
+        for idx, track_id in enumerate(soundcloud_track_ids):
+            files[f"playlist[tracks][{idx}][id]"] = (None, str(track_id))
+        
+        # Add image 
+        if image_data:
+            files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
+        
+        # POST to SoundCloud
+        response = requests.post(
+            f"{SOUNDCLOUD_API_BASE_URL}/playlists",
+            headers={"Authorization": f"OAuth {session.get('soundcloud_token')}"},
+            files=files
+        )
 
-    headers = {"Authorization": f"OAuth {session.get('soundcloud_token')}"}
-    response = requests.post(
-        f"{SOUNDCLOUD_API_BASE_URL}/playlists",
-        headers=headers,
-        json=soundcloud_playlist_data
-    )
 
     if response.status_code != 201:
         logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
