@@ -242,14 +242,6 @@ def transfer_playlist_spotify(playlist_id):
             "transfer_playlist_spotify.html",
             playlist_name=playlist_name,
             tracks=track_list,
-
-
-    if response.status_code != 201:
-        logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
-        return render_template(
-            "transfer_playlist_spotify.html",
-            playlist_name=playlist_name,
-            tracks=track_list,
             success=False,
             message="Failed to create playlist on SoundCloud. Please try again."
         )
