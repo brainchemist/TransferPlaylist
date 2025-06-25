@@ -148,16 +148,25 @@ def transfer_playlist_spotify(playlist_id):
     soundcloud_track_ids = []
 
     for item in tracks_data:
-        track = item["track"]
-        track_name = track["name"]
-        artist_name = track["artists"][0]["name"]
-        album_image = track["album"]["images"][0]["url"] if track["album"]["images"] else "/static/default-cover.jpg"
-        track_list.append({"name": track_name, "artist": artist_name, "album_image": album_image})
+        track = item.get("track")
+        if not track:
+            logging.warning("Skipped a None track (possibly deleted or unavailable).")
+            continue
+
+        track_name = track.get("name", "Unknown Track")
+        artist_name = track.get("artists", [{}])[0].get("name", "Unknown Artist")
+        album_image = track.get("album", {}).get("images", [{}])[0].get("url", "/static/default-cover.jpg")
+
+        track_list.append({
+            "name": track_name,
+            "artist": artist_name,
+            "album_image": album_image
+        })
 
         fallback_queries = [
             clean_track_query(track_name, artist_name),
             track_name.lower(),
-            f"{track_name} {artist_name}".lower()
+            f"{track_name} {artist_name.split(' ')[0]}".lower()
         ]
 
         token = session.get("soundcloud_token")
