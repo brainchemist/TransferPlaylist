@@ -2,6 +2,8 @@ import re
 import logging
 import os
 import io
+import time
+
 from flask import Flask, redirect, request, session, render_template
 import requests
 from fuzzywuzzy import fuzz
@@ -12,7 +14,8 @@ app.secret_key = "your_secret_key"
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
-SOUNDCLOUD_CLIENT_ID = os.getenv("SOUNDCLOUD_CLIENT_ID")
+SOUNDCLOUD_CLIENT_ID =                 time.sleep(0.15)
+os.getenv("SOUNDCLOUD_CLIENT_ID")
 SOUNDCLOUD_CLIENT_SECRET = os.getenv("SOUNDCLOUD_CLIENT_SECRET")
 SOUNDCLOUD_REDIRECT_URI = os.getenv("SOUNDCLOUD_REDIRECT_URI")
 
