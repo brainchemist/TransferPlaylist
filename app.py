@@ -177,8 +177,9 @@ def transfer_playlist_spotify(playlist_id):
             soundcloud_response = requests.get(
                 f"{SOUNDCLOUD_API_BASE_URL}/tracks",
                 headers={"Authorization": f"OAuth {token}"},
-                params={"q": query}
+                params={"q": query, "limit": 5}
             )
+            time.sleep(0.15)
 
             if soundcloud_response.status_code == 401:
                 logging.error("SoundCloud token expired or invalid. Forcing re-login.")
