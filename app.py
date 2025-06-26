@@ -191,6 +191,7 @@ def transfer_playlist_spotify(playlist_id):
                 logging.error(f"SoundCloud API Error: {soundcloud_response.status_code}, {soundcloud_response.text}")
 
         if soundcloud_tracks:
+            logging.info(f"Got {len(soundcloud_tracks)} tracks from SoundCloud for {track_name}")
             best_match = find_best_match(track_name, artist_name, soundcloud_tracks)
             if best_match:
                 soundcloud_track_ids.append(best_match["id"])
