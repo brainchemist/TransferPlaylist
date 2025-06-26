@@ -3,7 +3,6 @@ import logging
 import os
 import io
 import time
-from flask import session as flask_session
 from flask import Flask, redirect, request, session,render_template
 import requests
 
@@ -65,7 +64,7 @@ def callback_spotify():
         "client_id": SPOTIFY_CLIENT_ID,
         "client_secret": SPOTIFY_CLIENT_SECRET,
     }
-    response = requests.post(SPOTIFY_TOKEN_URL, data=token_data)
+    response = requests.post(SPOTIFY_TOKEN_URL, data=token_data, verify=False)
     if response.status_code != 200:
         return f"Failed to retrieve access token. Error: {response.text}", 500
     session["spotify_token"] = response.json().get("access_token")
@@ -110,19 +109,19 @@ def choose_playlist():
     if not session.get("spotify_token"):
         return redirect("/login_spotify")
     headers = {"Authorization": f"Bearer {session['spotify_token']}"}
-    response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers)
+    response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers, verify=False)
     playlists = response.json().get("items", [])
     return render_template("choose_playlist_spotify.html", playlists=playlists)
 
 @app.route("/transfer_playlist_spotify/<playlist_id>")
 def transfer_playlist_spotify(playlist_id):
-    if not flask_session.get("spotify_token"):
+    if not session.get("spotify_token"):
         return redirect("/login_spotify")
-    if not flask_session.get("soundcloud_token"):
+    if not session.get("soundcloud_token"):
         logging.warning("User is not logged into SoundCloud. Redirecting to login.")
         return redirect("/login_soundcloud")
 
-    headers = {"Authorization": f"Bearer {flask_session['spotify_token']}"}
+    headers = {"Authorization": f"Bearer {session['spotify_token']}"}
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
     if response.status_code != 200:
         logging.error(
