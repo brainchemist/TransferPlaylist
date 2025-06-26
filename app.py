@@ -353,4 +353,4 @@ def transfer_playlist_soundcloud(playlist_id):
         if add_response.status_code != 201:
             return "Failed to add tracks to Spotify playlist", 400
 
-    return render_template("transfer_success.html", playlist_name=playlist_title)
+    return render_template("transfer_playlist_soundcloud.html", playlist_name=playlist_title)
