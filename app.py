@@ -217,11 +217,6 @@ def transfer_playlist_spotify(playlist_id):
                     image_data.name = "cover.jpg"
                     valid_image = True
 
-    files = {
-        "playlist[title]": (None, playlist_name),
-        "playlist[sharing]": (None, "public"),
-        "playlist[description]": (None, f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"),
-    }
 
     files_list = [
         ("playlist[title]", (None, playlist_name)),
@@ -238,15 +233,8 @@ def transfer_playlist_spotify(playlist_id):
     if image_data:
         files_list.append(("playlist[artwork_data]", ("cover.jpg", image_data, "image/jpeg")))
 
-    # Make the POST request with flat list of tuples
-    response = requests.post(
-        f"{SOUNDCLOUD_API_BASE_URL}/playlists",
-        headers={"Authorization": f"OAuth {session['soundcloud_token']}"},
-        files=files_list
-    )
-
     if valid_image and image_data:
-        files["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
+        files_list["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
     else:
         logging.warning("Skipping image upload due to invalid image format or size.")
 
@@ -254,7 +242,7 @@ def transfer_playlist_spotify(playlist_id):
     response = requests.post(
         f"{SOUNDCLOUD_API_BASE_URL}/playlists",
         headers={"Authorization": f"OAuth {session['soundcloud_token']}"},
-        files=files
+        files=files_list
     )
 
     if response.status_code != 201:
