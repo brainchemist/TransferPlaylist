@@ -43,6 +43,8 @@ def index():
 
 @app.route("/login_spotify")
 def login_spotify():
+    redirect_after = request.args.get("redirect", "/choose_playlist")
+    session["post_spotify_redirect"] = redirect_after
     auth_url = (
         f"{SPOTIFY_AUTH_URL}?client_id={SPOTIFY_CLIENT_ID}"
         "&response_type=code"
@@ -67,7 +69,8 @@ def callback_spotify():
     if response.status_code != 200:
         return f"Failed to retrieve access token. Error: {response.text}", 500
     session["spotify_token"] = response.json().get("access_token")
-    return redirect("/choose_playlist")
+    return redirect(session.pop("post_spotify_redirect", "/choose_playlist"))
+
 
 @app.route("/login_soundcloud")
 def login_soundcloud():
