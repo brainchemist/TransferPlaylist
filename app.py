@@ -264,115 +264,93 @@ def choose_playlist_soundcloud():
 
 @app.route("/transfer_playlist_soundcloud/<playlist_id>")
 def transfer_playlist_soundcloud(playlist_id):
-    if not session.get("soundcloud_token"):
+    access_token = session.get("soundcloud_token")
+    if not access_token:
         return redirect("/login_soundcloud")
-    if not session.get("spotify_token"):
-        return redirect("/login_spotify")
 
-    headers_sc = {"Authorization": f"OAuth {session['soundcloud_token']}"}
-    response = requests.get(f"{SOUNDCLOUD_API_BASE_URL}/playlists/{playlist_id}", headers=headers_sc)
-    playlist_data = response.json()
+    # Fetch SoundCloud playlist
+    headers = {"Authorization": f"OAuth {access_token}"}
+    playlist_response = requests.get(f"https://api.soundcloud.com/playlists/{playlist_id}", headers=headers)
+    if playlist_response.status_code != 200:
+        return "Failed to fetch SoundCloud playlist", 400
+    playlist_data = playlist_response.json()
 
-    playlist_name = playlist_data.get("title", "Transferred Playlist")
-    playlist_description = playlist_data.get("description", "")
+    playlist_title = playlist_data.get("title", "Untitled Playlist")
     tracks_data = playlist_data.get("tracks", [])
+    print(f"[DEBUG] Transferring SoundCloud playlist: '{playlist_title}', with {len(tracks_data)} tracks")
 
-    print(f"[DEBUG] Transferring SoundCloud playlist: '{playlist_name}', with {len(tracks_data)} tracks")
-
+    # Check Spotify token and refresh if needed
     token_check = requests.get(
         f"{SPOTIFY_API_BASE_URL}/me",
         headers={"Authorization": f"Bearer {session.get('spotify_token')}"}
     )
-
     if token_check.status_code == 401:
         session.pop("spotify_token", None)
         return redirect("/login_spotify")
 
-    track_list = []
-    spotify_track_uris = []
+    # Get Spotify user ID
+    user_response = requests.get(
+        f"{SPOTIFY_API_BASE_URL}/me",
+        headers={"Authorization": f"Bearer {session['spotify_token']}"}
+    )
+    if user_response.status_code != 200:
+        return "Failed to fetch Spotify user info", 400
+    user_id = user_response.json().get("id")
+    print(f"[DEBUG] Spotify user ID: {user_id}")
 
+    # Create the Spotify playlist (without description)
+    playlist_json = {
+        "name": playlist_title,
+        "public": False
+    }
+    print(f"[DEBUG] Final Playlist JSON: {json.dumps(playlist_json)}")
+    create_response = requests.post(
+        f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
+        headers={
+            "Authorization": f"Bearer {session['spotify_token']}",
+            "Content-Type": "application/json"
+        },
+        data=json.dumps(playlist_json)
+    )
+    print(f"[DEBUG] Create playlist → Status: {create_response.status_code}")
+    print(f"[DEBUG] Response: {create_response.text}")
+    if create_response.status_code != 201:
+        print("[DEBUG] Failed to create Spotify playlist")
+        return "Failed to create Spotify playlist", 400
+
+    spotify_playlist_id = create_response.json().get("id")
+
+    # Search for each track on Spotify
+    track_uris = []
     for track in tracks_data:
         track_title = track.get("title", "Unknown Track")
         track_artist = track.get("user", {}).get("username", "Unknown Artist")
         query = re.sub(r'[^\w\s]', '', f"{track_title} {track_artist}")
         print(f"[DEBUG] Searching: {query}", end="")
 
-        spotify_response = requests.get(
+        search_response = requests.get(
             f"{SPOTIFY_API_BASE_URL}/search",
-            headers={"Authorization": f"Bearer {session.get('spotify_token')}"},
+            headers={"Authorization": f"Bearer {session['spotify_token']}"},
             params={"q": query, "type": "track", "limit": 1}
         )
-        spotify_tracks = spotify_response.json().get("tracks", {}).get("items", [])
-        found = bool(spotify_tracks)
-        print(f" → Found: {found}")
-        print(f"[DEBUG] Query used: {query}")
-        print(f"[DEBUG] Raw Spotify API response: {spotify_response.text}")
+        print(f" → Found: {search_response.status_code == 200 and search_response.json().get('tracks', {}).get('items')}")
+        if search_response.status_code == 200:
+            search_json = search_response.json()
+            items = search_json.get("tracks", {}).get("items")
+            if items:
+                track_uri = items[0].get("uri")
+                if track_uri:
+                    track_uris.append(track_uri)
 
-        if found:
-            spotify_track_uris.append(spotify_tracks[0]["uri"])
-            track_list.append({
-                "name": track_title,
-                "artist": track_artist
-            })
-
-    success = False
-    if spotify_track_uris:
-        user_response = requests.get(
-            f"{SPOTIFY_API_BASE_URL}/me",
-            headers={"Authorization": f"Bearer {session.get('spotify_token')}"}
+    # Add tracks to the new Spotify playlist
+    if track_uris:
+        add_response = requests.post(
+            f"{SPOTIFY_API_BASE_URL}/playlists/{spotify_playlist_id}/tracks",
+            headers={"Authorization": f"Bearer {session['spotify_token']}", "Content-Type": "application/json"},
+            data=json.dumps({"uris": track_uris})
         )
-        user_id = user_response.json().get("id")
-        print(f"[DEBUG] Spotify user ID: {user_id}")
+        print(f"[DEBUG] Added tracks → Status: {add_response.status_code}")
+        if add_response.status_code != 201:
+            return "Failed to add tracks to Spotify playlist", 400
 
-        # Clean playlist name and description
-        def clean_text(text, max_len):
-            cleaned = re.sub(r"[^\x20-\x7E]+", "", text)  # remove non-ASCII
-            return cleaned.strip()[:max_len]
-
-        name = clean_text(playlist_name, 100) or "Transferred Playlist"
-        description = clean_text(playlist_description or "", 280)
-        description += "\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"
-        description = description[:300]
-
-        playlist_payload = {
-            "name": name,
-            "description": description,
-            "public": False
-        }
-
-        print(f"[DEBUG] Final Playlist JSON: {json.dumps(playlist_payload)}")
-
-        create_playlist_response = requests.post(
-            f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
-            headers={
-                "Authorization": f"Bearer {session.get('spotify_token')}",
-                "Content-Type": "application/json"
-            },
-            json=playlist_payload
-        )
-        print(f"[DEBUG] Create playlist → Status: {create_playlist_response.status_code}")
-        print(f"[DEBUG] Response: {create_playlist_response.text}")
-
-        playlist_id_spotify = create_playlist_response.json().get("id")
-        if playlist_id_spotify:
-            add_tracks_response = requests.post(
-                f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id_spotify}/tracks",
-                headers={
-                    "Authorization": f"Bearer {session.get('spotify_token')}",
-                    "Content-Type": "application/json"
-                },
-                json={"uris": spotify_track_uris}
-            )
-            if add_tracks_response.status_code == 201:
-                success = True
-            else:
-                print(f"[DEBUG] Failed to add tracks → {add_tracks_response.status_code} {add_tracks_response.text}")
-        else:
-            print("[DEBUG] Failed to create Spotify playlist")
-
-    return render_template(
-        "transfer_playlist_soundcloud.html",
-        playlist_name=playlist_name,
-        tracks=track_list,
-        success=success
-    )
+    return render_template("transfer_success.html", playlist_name=playlist_title)
