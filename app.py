@@ -3,10 +3,9 @@ import logging
 import os
 import io
 import time
-
-from flask import Flask, redirect, request, session, render_template
+from flask import session as flask_session
+from flask import Flask, redirect, request, session,render_template
 import requests
-from fuzzywuzzy import fuzz
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -117,17 +116,19 @@ def choose_playlist():
 
 @app.route("/transfer_playlist_spotify/<playlist_id>")
 def transfer_playlist_spotify(playlist_id):
-    if not session.get("spotify_token"):
+    if not flask_session.get("spotify_token"):
         return redirect("/login_spotify")
-    if not session.get("soundcloud_token"):
+    if not flask_session.get("soundcloud_token"):
         logging.warning("User is not logged into SoundCloud. Redirecting to login.")
         return redirect("/login_soundcloud")
 
-    headers = {"Authorization": f"Bearer {session['spotify_token']}"}
+    headers = {"Authorization": f"Bearer {flask_session['spotify_token']}"}
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
     if response.status_code != 200:
-        logging.error(f"Failed to fetch Spotify playlist. Status Code: {response.status_code}, Response: {response.text}")
-        return render_template("transfer_playlist_spotify.html", playlist_name="Unknown Playlist", tracks=[], success=False, message="Failed to fetch playlist from Spotify. Please try again.")
+        logging.error(
+            f"Failed to fetch Spotify playlist. Status Code: {response.status_code}, Response: {response.text}")
+        return render_template("transfer_playlist_spotify.html", playlist_name="Unknown Playlist", tracks=[],
+                               success=False, message="Failed to fetch playlist from Spotify. Please try again.")
 
     playlist_data = response.json()
     playlist_name = playlist_data.get("name", "Transferred Playlist")
