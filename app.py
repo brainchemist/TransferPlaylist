@@ -275,6 +275,8 @@ def transfer_playlist_soundcloud(playlist_id):
     playlist_description = playlist_data.get("description", "")
     tracks_data = playlist_data.get("tracks", [])
 
+    print(f"[DEBUG] Transferring SoundCloud playlist: '{playlist_name}', with {len(tracks_data)} tracks")
+
     track_list = []
     spotify_track_uris = []
     for track in tracks_data:
@@ -291,6 +293,8 @@ def transfer_playlist_soundcloud(playlist_id):
             params={"q": query, "type": "track", "limit": 1}
         )
         spotify_tracks = spotify_response.json().get("tracks", {}).get("items", [])
+        print(f"[DEBUG] Searching: {query} → Found: {bool(spotify_tracks)}")
+
         if spotify_tracks:
             spotify_track_uris.append(spotify_tracks[0]["uri"])
 
@@ -301,6 +305,8 @@ def transfer_playlist_soundcloud(playlist_id):
             headers={"Authorization": f"Bearer {session.get('spotify_token')}"}
         )
         user_id = user_response.json().get("id")
+        print(f"[DEBUG] Spotify user ID: {user_id}")
+
         playlist_data = {
             "name": playlist_name,
             "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
@@ -311,6 +317,9 @@ def transfer_playlist_soundcloud(playlist_id):
             headers={"Authorization": f"Bearer {session.get('spotify_token')}", "Content-Type": "application/json"},
             json=playlist_data
         )
+        print(f"[DEBUG] Create playlist → Status: {create_playlist_response.status_code}")
+        print(f"[DEBUG] Response: {create_playlist_response.text}")
+
         playlist_id_spotify = create_playlist_response.json().get("id")
         if playlist_id_spotify:
             add_tracks_response = requests.post(
@@ -318,8 +327,16 @@ def transfer_playlist_soundcloud(playlist_id):
                 headers={"Authorization": f"Bearer {session.get('spotify_token')}", "Content-Type": "application/json"},
                 json={"uris": spotify_track_uris}
             )
+            print(f"[DEBUG] Add tracks → Status: {add_tracks_response.status_code}")
+            print(f"[DEBUG] Response: {add_tracks_response.text}")
+
             if add_tracks_response.status_code == 201:
                 success = True
+        else:
+            print("[DEBUG] Failed to create Spotify playlist")
+
+    else:
+        print("[DEBUG] No tracks found to add to Spotify")
 
     return render_template(
         "transfer_playlist_soundcloud.html",
