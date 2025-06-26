@@ -74,7 +74,8 @@ def callback_spotify():
 
 @app.route("/login_soundcloud")
 def login_soundcloud():
-    session["post_soundcloud_redirect"] = request.referrer or "/"
+    redirect_after = request.args.get("redirect", request.referrer or "/")
+    session["post_soundcloud_redirect"] = redirect_after
     auth_url = (
         f"{SOUNDCLOUD_AUTH_URL}?client_id={SOUNDCLOUD_CLIENT_ID}"
         "&response_type=code"
