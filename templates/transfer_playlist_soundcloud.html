@@ -3,31 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transfer Playlist</title>
+    <title>Playlist Transfer Result</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h2>Transferring Tracks for Playlist: "{{ playlist_name }}"</h2>
+        <h2>Transfer Result for Playlist: "{{ playlist_name }}"</h2>
 
         {% if success %}
-            <p class="success">Playlist transferred successfully!</p>
+            <p class="success">✅ Playlist transferred successfully to Spotify!</p>
         {% else %}
-            <p class="error">Failed to transfer playlist. Some tracks may not have been found on Spotify.</p>
+            <p class="error">⚠️ Transfer incomplete. Some tracks may not have been found on Spotify.</p>
         {% endif %}
 
-        <ul class="track-list">
-            {% for track in tracks %}
-                <li class="track-item">
-                    <div class="track-card">
-                        <div class="track-details">
-                            <span class="track-name">{{ track.name }}</span>
-                            <span class="track-artist">{{ track.artist }}</span>
+        {% if tracks %}
+            <h3>Tracks Processed:</h3>
+            <ul class="track-list">
+                {% for track in tracks %}
+                    <li class="track-item">
+                        <div class="track-card">
+                            <div class="track-details">
+                                <span class="track-name"><strong>{{ track.name }}</strong></span><br>
+                                <span class="track-artist">{{ track.artist }}</span>
+                            </div>
                         </div>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No track information available.</p>
+        {% endif %}
     </div>
 </body>
 </html>
