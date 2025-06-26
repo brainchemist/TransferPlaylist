@@ -265,13 +265,14 @@ def choose_playlist_soundcloud():
 @app.route("/transfer_playlist_soundcloud/<playlist_id>")
 def transfer_playlist_soundcloud(playlist_id):
     if not session.get("soundcloud_token"):
-        return redirect("/login_soundcloud?redirect=/transfer_playlist_soundcloud?playlist_id=" + playlist_id)
+        return redirect("/login_soundcloud")
     if not session.get("spotify_token"):
-        return redirect("/login_spotify?redirect=/transfer_playlist_soundcloud?playlist_id=" + playlist_id)
+        return redirect("/login_spotify")
 
-    headers = {"Authorization": f"OAuth {session['soundcloud_token']}"}
-    response = requests.get(f"{SOUNDCLOUD_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
+    headers_sc = {"Authorization": f"OAuth {session['soundcloud_token']}"}
+    response = requests.get(f"{SOUNDCLOUD_API_BASE_URL}/playlists/{playlist_id}", headers=headers_sc)
     playlist_data = response.json()
+
     playlist_name = playlist_data.get("title", "Transferred Playlist")
     playlist_description = playlist_data.get("description", "")
     tracks_data = playlist_data.get("tracks", [])
@@ -280,24 +281,28 @@ def transfer_playlist_soundcloud(playlist_id):
 
     track_list = []
     spotify_track_uris = []
+
     for track in tracks_data:
         track_title = track.get("title", "Unknown Track")
         track_artist = track.get("user", {}).get("username", "Unknown Artist")
-        track_list.append({
-            "name": track_title,
-            "artist": track_artist,
-        })
         query = f"{track_title} {track_artist}"
+        print(f"[DEBUG] Searching: {query}", end="")
+
         spotify_response = requests.get(
             f"{SPOTIFY_API_BASE_URL}/search",
             headers={"Authorization": f"Bearer {session.get('spotify_token')}"},
             params={"q": query, "type": "track", "limit": 1}
         )
         spotify_tracks = spotify_response.json().get("tracks", {}).get("items", [])
-        print(f"[DEBUG] Searching: {query} → Found: {bool(spotify_tracks)}")
+        found = bool(spotify_tracks)
+        print(f" → Found: {found}")
 
-        if spotify_tracks:
+        if found:
             spotify_track_uris.append(spotify_tracks[0]["uri"])
+            track_list.append({
+                "name": track_title,
+                "artist": track_artist
+            })
 
     success = False
     if spotify_track_uris:
@@ -308,29 +313,31 @@ def transfer_playlist_soundcloud(playlist_id):
         user_id = user_response.json().get("id")
         print(f"[DEBUG] Spotify user ID: {user_id}")
 
-        description_cleaned = (playlist_description or "").strip()
-        attribution = "This playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"
+        # Clean playlist name and description
+        def clean_text(text, max_len):
+            cleaned = re.sub(r"[^\x20-\x7E]+", "", text)  # remove non-ASCII
+            return cleaned.strip()[:max_len]
 
-        if attribution.lower() not in description_cleaned.lower():
-            description_cleaned += f"\n\n{attribution}"
+        name = clean_text(playlist_name, 100) or "Transferred Playlist"
+        description = clean_text(playlist_description or "", 280)
+        description += "\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com"
+        description = description[:300]
 
-        # Limit safely to avoid JSON encoding or length issues
-        description_cleaned = description_cleaned.encode("utf-8", errors="ignore").decode("utf-8")[:300]
-
-        playlist_data = {
-            "name": playlist_name.strip()[:100] or "Transferred Playlist",
-            "description": description_cleaned,
+        playlist_payload = {
+            "name": name,
+            "description": description,
             "public": False
         }
 
-        print(json.dumps(playlist_data, indent=2, ensure_ascii=False))
-
-        print("[DEBUG] Final Playlist JSON:", json.dumps(playlist_data, ensure_ascii=False))
+        print(f"[DEBUG] Final Playlist JSON: {json.dumps(playlist_payload)}")
 
         create_playlist_response = requests.post(
             f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
-            headers={"Authorization": f"Bearer {session.get('spotify_token')}", "Content-Type": "application/json"},
-            json=playlist_data
+            headers={
+                "Authorization": f"Bearer {session.get('spotify_token')}",
+                "Content-Type": "application/json"
+            },
+            json=playlist_payload
         )
         print(f"[DEBUG] Create playlist → Status: {create_playlist_response.status_code}")
         print(f"[DEBUG] Response: {create_playlist_response.text}")
@@ -339,19 +346,18 @@ def transfer_playlist_soundcloud(playlist_id):
         if playlist_id_spotify:
             add_tracks_response = requests.post(
                 f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id_spotify}/tracks",
-                headers={"Authorization": f"Bearer {session.get('spotify_token')}", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {session.get('spotify_token')}",
+                    "Content-Type": "application/json"
+                },
                 json={"uris": spotify_track_uris}
             )
-            print(f"[DEBUG] Add tracks → Status: {add_tracks_response.status_code}")
-            print(f"[DEBUG] Response: {add_tracks_response.text}")
-
             if add_tracks_response.status_code == 201:
                 success = True
+            else:
+                print(f"[DEBUG] Failed to add tracks → {add_tracks_response.status_code} {add_tracks_response.text}")
         else:
             print("[DEBUG] Failed to create Spotify playlist")
-
-    else:
-        print("[DEBUG] No tracks found to add to Spotify")
 
     return render_template(
         "transfer_playlist_soundcloud.html",
