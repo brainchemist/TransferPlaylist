@@ -308,10 +308,13 @@ def transfer_playlist_soundcloud(playlist_id):
         print(f"[DEBUG] Spotify user ID: {user_id}")
 
         playlist_data = {
-            "name": playlist_name,
-            "description": f"{(playlist_description or '')} This playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
+            "name": playlist_name.strip()[:100] or "Transferred Playlist",
+            "description": (playlist_description or "").strip()[
+                           :300] + " This playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
             "public": False
         }
+        print("[DEBUG] Final Playlist JSON:", playlist_data)
+
         create_playlist_response = requests.post(
             f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
             headers={"Authorization": f"Bearer {session.get('spotify_token')}", "Content-Type": "application/json"},
