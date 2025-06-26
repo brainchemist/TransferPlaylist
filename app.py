@@ -27,27 +27,13 @@ SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
 SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
 
 def find_best_match(track_name, artist_name, soundcloud_tracks):
-    best_match = None
-    highest_score = 0
     for track in soundcloud_tracks:
-        if not isinstance(track, dict):
-            logging.error(f"Unexpected track format: {track}")
-            continue
-        title = track.get("title", "").lower()
-        artist = track.get("user", {}).get("username", "").lower()
-        title_score = fuzz.ratio(title, track_name.lower())
-        artist_score = fuzz.ratio(artist, artist_name.lower())
-        total_score = (title_score + artist_score) / 2
+        if isinstance(track, dict):
+            logging.info(f"Picked first match for '{track_name}' by '{artist_name}': {track.get('title')}")
+            return track
+    logging.warning(f"No valid track dict found for: {track_name}")
+    return None
 
-        logging.info(f"Evaluating match: '{title}' by '{artist}' | Score: {total_score}")
-
-        if total_score > highest_score:
-            highest_score = total_score
-            best_match = track
-
-    logging.info(f"Best match score for '{track_name}': {highest_score}")
-
-    return best_match if highest_score > 50 else None
 
 def clean_track_query(title, artist):
     title = re.sub(r"\(.*?\)|\[.*?\]|- .*", "", title)
