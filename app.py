@@ -1,3 +1,4 @@
+import json
 import re
 import logging
 import os
@@ -319,7 +320,7 @@ def transfer_playlist_soundcloud(playlist_id):
             "public": False
         }
 
-        print("[DEBUG] Final Playlist JSON:", playlist_data)
+        print("[DEBUG] Final Playlist JSON:", json.dumps(playlist_data, ensure_ascii=False))
 
         create_playlist_response = requests.post(
             f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
