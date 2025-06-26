@@ -325,7 +325,7 @@ def transfer_playlist_soundcloud(playlist_id):
     for track in tracks_data:
         track_title = track.get("title", "Unknown Track")
         track_artist = track.get("user", {}).get("username", "Unknown Artist")
-        query = f"{track_title.split('-')[0].strip()} {track_artist}".strip()
+        query = f'track:"{track_title}" artist:"{track_artist}"'
         print(f"[DEBUG] Searching: {query}", end="")
 
         search_response = requests.get(
