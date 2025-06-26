@@ -285,7 +285,7 @@ def transfer_playlist_soundcloud(playlist_id):
     for track in tracks_data:
         track_title = track.get("title", "Unknown Track")
         track_artist = track.get("user", {}).get("username", "Unknown Artist")
-        query = f"{track_title} {track_artist}"
+        query = re.sub(r'[^\w\s]', '', f"{track_title} {track_artist}")
         print(f"[DEBUG] Searching: {query}", end="")
 
         spotify_response = requests.get(
@@ -296,6 +296,8 @@ def transfer_playlist_soundcloud(playlist_id):
         spotify_tracks = spotify_response.json().get("tracks", {}).get("items", [])
         found = bool(spotify_tracks)
         print(f" → Found: {found}")
+        print(f"[DEBUG] Query used: {query}")
+        print(f"[DEBUG] Raw Spotify API response: {spotify_response.text}")
 
         if found:
             spotify_track_uris.append(spotify_tracks[0]["uri"])
