@@ -279,6 +279,15 @@ def transfer_playlist_soundcloud(playlist_id):
 
     print(f"[DEBUG] Transferring SoundCloud playlist: '{playlist_name}', with {len(tracks_data)} tracks")
 
+    token_check = requests.get(
+        f"{SPOTIFY_API_BASE_URL}/me",
+        headers={"Authorization": f"Bearer {session.get('spotify_token')}"}
+    )
+
+    if token_check.status_code == 401:
+        session.pop("spotify_token", None)
+        return redirect("/login_spotify")
+
     track_list = []
     spotify_track_uris = []
 
