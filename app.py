@@ -309,7 +309,7 @@ def transfer_playlist_soundcloud(playlist_id):
 
         playlist_data = {
             "name": playlist_name,
-            "description": f"{playlist_description}\n\nThis playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
+            "description": f"{(playlist_description or '')} This playlist was created using TrackPlaylist by Zack - https://transferplaylist-2nob.onrender.com",
             "public": False
         }
         create_playlist_response = requests.post(
