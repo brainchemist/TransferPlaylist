@@ -217,7 +217,6 @@ def transfer_playlist_spotify(playlist_id):
                     image_data.name = "cover.jpg"
                     valid_image = True
 
-
     files_list = [
         ("playlist[title]", (None, playlist_name)),
         ("playlist[sharing]", (None, "public")),
@@ -230,14 +229,11 @@ def transfer_playlist_spotify(playlist_id):
         files_list.append(("playlist[tracks][][id]", (None, str(track_id))))
 
     # Append image if available
-    if image_data:
-        files_list.append(("playlist[artwork_data]", ("cover.jpg", image_data, "image/jpeg")))
-
     if valid_image and image_data:
-        files_list["playlist[artwork_data]"] = ("cover.jpg", image_data, "image/jpeg")
+        files_list.append(("playlist[artwork_data]", ("cover.jpg", image_data, "image/jpeg")))
+        logging.info("Playlist image attached successfully.")
     else:
         logging.warning("Skipping image upload due to invalid image format or size.")
-
 
     response = requests.post(
         f"{SOUNDCLOUD_API_BASE_URL}/playlists",
