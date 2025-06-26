@@ -325,7 +325,7 @@ def transfer_playlist_soundcloud(playlist_id):
     for track in tracks_data:
         track_title = track.get("title", "Unknown Track")
         track_artist = track.get("user", {}).get("username", "Unknown Artist")
-        query = re.sub(r'[^\w\s]', '', f"{track_title} {track_artist}")
+        query = f"{track_title} {track_artist}".strip()
         print(f"[DEBUG] Searching: {query}", end="")
 
         search_response = requests.get(
@@ -353,4 +353,4 @@ def transfer_playlist_soundcloud(playlist_id):
         if add_response.status_code != 201:
             return "Failed to add tracks to Spotify playlist", 400
 
-    return render_template("transfer_playlist_soundcloud.html", playlist_name=playlist_title)
+    return render_template("transfer_playlist_soundcloud.html", playlist_name=playlist_title,)
