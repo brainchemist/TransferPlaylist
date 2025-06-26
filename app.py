@@ -314,11 +314,16 @@ def transfer_playlist_soundcloud(playlist_id):
         if attribution.lower() not in description_cleaned.lower():
             description_cleaned += f"\n\n{attribution}"
 
+        # Limit safely to avoid JSON encoding or length issues
+        description_cleaned = description_cleaned.encode("utf-8", errors="ignore").decode("utf-8")[:300]
+
         playlist_data = {
             "name": playlist_name.strip()[:100] or "Transferred Playlist",
-            "description": description_cleaned[:300],
+            "description": description_cleaned,
             "public": False
         }
+
+        print(json.dumps(playlist_data, indent=2, ensure_ascii=False))
 
         print("[DEBUG] Final Playlist JSON:", json.dumps(playlist_data, ensure_ascii=False))
 
