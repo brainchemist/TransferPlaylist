@@ -64,7 +64,7 @@ def callback_spotify():
         "client_id": SPOTIFY_CLIENT_ID,
         "client_secret": SPOTIFY_CLIENT_SECRET,
     }
-    response = requests.post(SPOTIFY_TOKEN_URL, data=token_data, verify=False)
+    response = requests.post(SPOTIFY_TOKEN_URL, data=token_data)
     if response.status_code != 200:
         return f"Failed to retrieve access token. Error: {response.text}", 500
     session["spotify_token"] = response.json().get("access_token")
@@ -109,7 +109,7 @@ def choose_playlist():
     if not session.get("spotify_token"):
         return redirect("/login_spotify")
     headers = {"Authorization": f"Bearer {session['spotify_token']}"}
-    response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers, verify=False)
+    response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers)
     playlists = response.json().get("items", [])
     return render_template("choose_playlist_spotify.html", playlists=playlists)
 
