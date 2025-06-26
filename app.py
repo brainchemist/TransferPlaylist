@@ -246,3 +246,61 @@ def transfer_playlist_spotify(playlist_id):
         return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list, success=False, message="Failed to create playlist on SoundCloud. Please try again.")
 
     return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list, success=True, message="Playlist created successfully!")
+
+
+@app.route("/transfer_playlist_soundcloud", methods=["GET"])
+def transfer_playlist_soundcloud():
+    if not session.get("soundcloud_token"):
+        return redirect("/login_soundcloud")
+    if not session.get("spotify_token"):
+        return redirect("/login_spotify")
+
+    soundcloud_playlist_id = request.args.get("playlist_id")
+    headers = {"Authorization": f"Bearer {session['soundcloud_token']}"}
+    response = requests.get(f"{SOUNDCLOUD_API_BASE_URL}/playlists/{soundcloud_playlist_id}", headers=headers)
+    if response.status_code != 200:
+        return render_template("transfer_playlist_soundcloud.html", success=False, message="Failed to fetch SoundCloud playlist.")
+
+    soundcloud_data = response.json()
+    soundcloud_playlist_title = soundcloud_data.get("title", "Untitled")
+    tracks = soundcloud_data.get("tracks", [])
+
+    spotify_headers = {"Authorization": f"Bearer {session['spotify_token']}"}
+
+    # Get Spotify user ID
+    user_profile = requests.get(f"{SPOTIFY_API_BASE_URL}/me", headers=spotify_headers)
+    if user_profile.status_code != 200:
+        return render_template("transfer_playlist_soundcloud.html", success=False, message="Failed to fetch Spotify profile.")
+    spotify_user_id = user_profile.json()["id"]
+
+    # Create new playlist on Spotify
+    playlist_data = {
+        "name": f"SoundCloud - {soundcloud_playlist_title}",
+        "description": f"Transferred from SoundCloud: {soundcloud_playlist_title}",
+        "public": False
+    }
+    create_response = requests.post(f"{SPOTIFY_API_BASE_URL}/users/{spotify_user_id}/playlists", headers=spotify_headers, json=playlist_data)
+    if create_response.status_code != 201:
+        return render_template("transfer_playlist_soundcloud.html", success=False, message="Failed to create new Spotify playlist.")
+
+    playlist_id = create_response.json()["id"]
+
+    # Search and add tracks
+    spotify_track_uris = []
+    for track in tracks:
+        title = track.get("title", "")
+        artist = track.get("user", {}).get("username", "")
+        query = f"track:{title} artist:{artist}"
+        search = requests.get(f"{SPOTIFY_API_BASE_URL}/search", headers=spotify_headers, params={"q": query, "type": "track", "limit": 1})
+        items = search.json().get("tracks", {}).get("items", [])
+        if items:
+            spotify_track_uris.append(items[0]["uri"])
+
+    # Add tracks to new Spotify playlist
+    if spotify_track_uris:
+        chunk_size = 100
+        for i in range(0, len(spotify_track_uris), chunk_size):
+            chunk = spotify_track_uris[i:i + chunk_size]
+            requests.post(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/tracks", headers=spotify_headers, json={"uris": chunk})
+
+    return render_template("transfer_playlist_soundcloud.html", success=True, message="Transfer complete!")
