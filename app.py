@@ -25,6 +25,7 @@ SOUNDCLOUD_AUTH_URL = "https://soundcloud.com/connect"
 SOUNDCLOUD_TOKEN_URL = "https://api.soundcloud.com/oauth2/token"
 SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
 
+
 def find_best_match(track_name, artist_name, soundcloud_tracks):
     for track in soundcloud_tracks:
         if isinstance(track, dict):
@@ -435,7 +436,8 @@ def handle_soundcloud_link(url):
     session["transfer_direction"] = "soundcloud_to_spotify"
     return redirect("/login_spotify?redirect=/complete_transfer")
 
-@app.route("/complete_transfer", methods=["GET", "POST"])
+
+@app.route("/complete_transfer")
 def complete_transfer():
     tracks = session.get("tracks_to_transfer", [])
     direction = session.get("transfer_direction")
@@ -448,102 +450,125 @@ def complete_transfer():
 
     if direction == "spotify_to_soundcloud":
         sc_token = session.get("soundcloud_token")
-        sc_client = soundcloud.Client(
-            client_id=SOUNDCLOUD_CLIENT_ID,
-            client_secret=SOUNDCLOUD_CLIENT_SECRET,
-            access_token=sc_token
-        )
+        if not sc_token:
+            return redirect("/login_soundcloud?redirect=/complete_transfer")
+
+        headers = {
+            "Authorization": f"OAuth {sc_token}"
+        }
 
         for track in tracks:
             query = f"{track['name']} {track['artist']}"
             print(f"[DEBUG] Searching SoundCloud for: {query}")
             try:
-                results = sc_client.get("/tracks", q=query, limit=1)
+                response = requests.get(
+                    f"{SOUNDCLOUD_API_BASE_URL}/tracks",
+                    headers=headers,
+                    params={"q": query, "limit": 1}
+                )
+                response.raise_for_status()
+                results = response.json()
                 if results:
                     t = results[0]
                     added_tracks.append({
-                        "name": t.title,
-                        "artist": t.user["username"],
-                        "id": t.id
+                        "name": t["title"],
+                        "artist": t["user"]["username"],
+                        "id": t["id"]
                     })
                 else:
                     failed_tracks.append(query)
             except Exception as e:
-                print(f"[ERROR] SoundCloud search failed: {e}")
+                print(f"[ERROR] SoundCloud search failed for {query}: {e}")
                 failed_tracks.append(query)
 
         if not added_tracks:
             return "No tracks were matched on SoundCloud", 400
 
-        playlist = sc_client.post("/playlists", playlist={
-            "title": "Transferred from Spotify",
-            "sharing": "public",
-            "tracks": [{"id": t["id"]} for t in added_tracks]
-        })
+        try:
+            playlist_data = {
+                "playlist": {
+                    "title": "Transferred from Spotify",
+                    "sharing": "public",
+                    "tracks": [{"id": t["id"]} for t in added_tracks]
+                }
+            }
+
+            playlist_response = requests.post(
+                f"{SOUNDCLOUD_API_BASE_URL}/playlists",
+                headers=headers,
+                json=playlist_data
+            )
+            playlist_response.raise_for_status()
+            playlist = playlist_response.json()
+        except Exception as e:
+            return f"Failed to create SoundCloud playlist: {e}", 500
 
         return render_template(
             "transfer_success.html",
-            playlist_name=playlist.title,
+            playlist_name=playlist["title"],
             tracks=added_tracks,
             success=True
         )
 
     elif direction == "soundcloud_to_spotify":
         sp_token = session.get("spotify_token")
+        if not sp_token:
+            return redirect("/login_spotify?redirect=/complete_transfer")
+
         headers = {"Authorization": f"Bearer {sp_token}"}
 
-        user_info = requests.get(f"{SPOTIFY_API_BASE_URL}/me", headers=headers).json()
-        user_id = user_info["id"]
+        try:
+            user_info = requests.get(f"{SPOTIFY_API_BASE_URL}/me", headers=headers).json()
+            user_id = user_info["id"]
 
-        playlist_data = {
-            "name": "Transferred from SoundCloud",
-            "public": False
-        }
+            playlist_data = {"name": "Transferred from SoundCloud", "public": False}
+            playlist_response = requests.post(
+                f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
+                headers=headers,
+                json=playlist_data
+            ).json()
+            playlist_id = playlist_response["id"]
+        except Exception as e:
+            return f"Failed to create Spotify playlist: {e}", 500
 
-        playlist_response = requests.post(
-            f"{SPOTIFY_API_BASE_URL}/users/{user_id}/playlists",
-            headers=headers,
-            json=playlist_data
-        ).json()
-
-        playlist_id = playlist_response["id"]
         track_uris = []
-
-        for track in tracks:
-            query = f"{track['name']} {track['artist']}"
-            print(f"[DEBUG] Searching Spotify for: {query}")
+        for query in tracks:
             try:
                 r = requests.get(
                     f"{SPOTIFY_API_BASE_URL}/search",
                     headers=headers,
                     params={"q": query, "type": "track", "limit": 1}
                 )
+                r.raise_for_status()
                 items = r.json().get("tracks", {}).get("items", [])
                 if items:
-                    track_obj = items[0]
-                    track_uris.append(track_obj["uri"])
+                    track = items[0]
+                    track_uris.append(track["uri"])
                     added_tracks.append({
-                        "name": track_obj["name"],
-                        "artist": track_obj["artists"][0]["name"]
+                        "name": track["name"],
+                        "artist": track["artists"][0]["name"]
                     })
                 else:
                     failed_tracks.append(query)
             except Exception as e:
-                print(f"[ERROR] Spotify search failed: {e}")
+                print(f"[ERROR] Spotify search failed for {query}: {e}")
                 failed_tracks.append(query)
 
         if track_uris:
-            requests.post(
-                f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/tracks",
-                headers=headers,
-                json={"uris": track_uris}
-            )
+            try:
+                requests.post(
+                    f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/tracks",
+                    headers=headers,
+                    json={"uris": track_uris}
+                )
+            except Exception as e:
+                return f"Failed to add tracks to Spotify playlist: {e}", 500
 
         return render_template(
             "transfer_success.html",
             playlist_name="Transferred from SoundCloud",
             tracks=added_tracks,
-            success=bool(added_tracks)
+            success=len(added_tracks) > 0
         )
 
     return "Unknown transfer direction", 400
