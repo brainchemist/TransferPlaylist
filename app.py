@@ -6,6 +6,7 @@ import io
 import time
 from flask import Flask, redirect, request, session, render_template
 import requests
+import base64
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -556,6 +557,32 @@ def complete_transfer():
                 json=playlist_data
             ).json()
             playlist_id = playlist_response["id"]
+
+            image_url = session.pop("playlist_artwork_url", None)
+            if image_url:
+                image_url = image_url.replace("-large", "-t500x500")  # Higher resolution
+                try:
+                    img_response = requests.get(image_url)
+                    if img_response.status_code == 200:
+                        image_data = img_response.content
+                        encoded_image = base64.b64encode(image_data).decode('utf-8')
+                        upload_headers = {
+                            "Authorization": f"Bearer {sp_token}",
+                            "Content-Type": "image/jpeg"
+                        }
+                        upload_cover = requests.put(
+                            f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}/images",
+                            headers=upload_headers,
+                            data=encoded_image
+                        )
+                        if upload_cover.status_code == 202:
+                            print("[DEBUG] Playlist cover uploaded successfully")
+                        else:
+                            print(
+                                f"[WARNING] Failed to upload cover image: {upload_cover.status_code}, {upload_cover.text}")
+                except Exception as e:
+                    print(f"[ERROR] Error downloading/uploading cover image: {e}")
+
         except Exception as e:
             return f"Failed to create Spotify playlist: {e}", 500
 
