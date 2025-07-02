@@ -413,13 +413,22 @@ def handle_spotify_link(url):
     return redirect("/login_soundcloud?redirect=/complete_transfer")
 
 def handle_soundcloud_link(url):
+    access_token = session.get("soundcloud_token")
+    if not access_token:
+        # Save the URL and redirect for login
+        session["playlist_url"] = url
+        session["transfer_direction"] = "soundcloud_to_spotify"
+        return redirect("/login_soundcloud?redirect=/transfer_from_url")
+
     resolve_url = "https://api.soundcloud.com/resolve"
+    headers = {
+        "Authorization": f"OAuth {access_token}"
+    }
     params = {
-        "url": url,
-        "client_id": SOUNDCLOUD_CLIENT_ID
+        "url": url
     }
 
-    res = requests.get(resolve_url, params=params)
+    res = requests.get(resolve_url, headers=headers, params=params)
     if res.status_code != 200:
         return f"Failed to resolve SoundCloud URL: {res.text}", 400
 
@@ -435,6 +444,7 @@ def handle_soundcloud_link(url):
     session["tracks_to_transfer"] = tracks
     session["transfer_direction"] = "soundcloud_to_spotify"
     return redirect("/login_spotify?redirect=/complete_transfer")
+
 
 
 @app.route("/complete_transfer")
