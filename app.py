@@ -404,8 +404,7 @@ def transfer_from_url():
         return redirect("/login_spotify?redirect=/complete_transfer")
 
     elif "soundcloud.com" in playlist_url:
-        session["direction"] = "soundcloud_to_spotify"
-        return redirect("/login_soundcloud?redirect=/complete_transfer")
+        return handle_soundcloud_link(playlist_url)
 
     return "Unsupported playlist link format", 400
 
