@@ -411,23 +411,42 @@ def transfer_from_url():
 
 
 def handle_spotify_link(url):
-    playlist_id = url.split("playlist/")[1].split("?")[0]
+    try:
+        playlist_id = url.split("playlist/")[1].split("?")[0]
+    except IndexError:
+        return "Invalid Spotify playlist URL", 400
+
     token = session.get("spotify_token")
+    if not token:
+        # Save current state and redirect back here after login
+        session["post_spotify_redirect"] = f"/transfer_from_url?playlist_url={url}"
+        return redirect("/login_spotify")
 
     headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers)
+    if r.status_code != 200:
+        return f"Failed to fetch Spotify playlist: {r.text}", 400
+
     playlist_data = r.json()
-
     tracks = []
-    for item in playlist_data["tracks"]["items"]:
-        track = item["track"]
-        title = track["name"]
-        artist = track["artists"][0]["name"]
-        tracks.append(f"{title} {artist}")
+    for item in playlist_data.get("tracks", {}).get("items", []):
+        track = item.get("track")
+        if not track:
+            continue
+        title = track.get("name")
+        artist = track.get("artists", [{}])[0].get("name")
+        if title and artist:
+            tracks.append({"name": title, "artist": artist})
 
-    # Optional: Authenticate to SoundCloud or queue to another route
+    # Store playlist image and name if available
+    image_url = playlist_data.get("images", [{}])[0].get("url")
+    playlist_name = playlist_data.get("name", "Transferred Playlist")
+
     session["tracks_to_transfer"] = tracks
     session["transfer_direction"] = "spotify_to_soundcloud"
+    session["playlist_image_url"] = image_url
+    session["playlist_name"] = playlist_name
+
     return redirect("/login_soundcloud?redirect=/complete_transfer")
 
 
@@ -453,6 +472,8 @@ def handle_soundcloud_link(url):
         return f"Failed to resolve SoundCloud URL: {res.text}", 400
 
     playlist = res.json()
+    session["playlist_title"] = playlist.get("title", "Transferred from SoundCloud")
+    session["playlist_artwork_url"] = playlist.get("artwork_url")
     tracks = []
 
     for track in playlist.get("tracks", []):
