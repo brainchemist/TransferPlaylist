@@ -117,7 +117,19 @@ def callback_soundcloud():
     logging.debug(f"[DEBUG] Received access token: {access_token}")
     session["soundcloud_token"] = access_token
 
-    return redirect(session.pop("post_soundcloud_redirect", "/"))
+    if "transfer_url" not in session or "transfer_direction" not in session:
+        logging.warning("[WARNING] Missing transfer session. Attempting recovery fallback.")
+        playlist_url = request.args.get("playlist_url")
+        if playlist_url:
+            session["transfer_url"] = playlist_url
+            session["transfer_direction"] = "soundcloud_to_spotify"
+            logging.debug(f"[DEBUG] Recovered transfer_url from query: {playlist_url}")
+        else:
+            logging.debug("[DEBUG] No playlist_url in query. Recovery not possible.")
+
+    redirect_to = session.pop("post_soundcloud_redirect", "/")
+    logging.debug(f"[DEBUG] Redirecting to: {redirect_to}")
+    return redirect(redirect_to)
 
 
 @app.route("/choose_playlist")
