@@ -401,8 +401,7 @@ def transfer_from_url():
         return "Missing playlist URL", 400
 
     if "open.spotify.com/playlist" in playlist_url:
-        session["direction"] = "spotify_to_soundcloud"
-        return redirect("/login_spotify?redirect=/complete_transfer")
+        return handle_spotify_link(playlist_url)
 
     elif "soundcloud.com" in playlist_url:
         return handle_soundcloud_link(playlist_url)
@@ -537,11 +536,22 @@ def complete_transfer():
         try:
             playlist_data = {
                 "playlist": {
-                    "title": "Transferred from Spotify",
+                    "title": session.pop("playlist_name", "Transferred from Spotify"),
                     "sharing": "public",
-                    "tracks": [{"id": t["id"]} for t in added_tracks]
+                    "tracks": [{"id": t["id"]} for t in added_tracks],
                 }
             }
+
+            # Add image if available
+            image_url = session.pop("playlist_image_url", None)
+            if image_url:
+                image_response = requests.get(image_url)
+                if image_response.status_code == 200:
+                    content_type = image_response.headers.get("Content-Type", "")
+                    if "jpeg" in content_type or image_url.lower().endswith(".jpg"):
+                        raw_image = image_response.content
+                        if len(raw_image) < 2 * 1024 * 1024:
+                            playlist_data["playlist"]["artwork_data"] = base64.b64encode(raw_image).decode('utf-8')
 
             playlist_response = requests.post(
                 f"{SOUNDCLOUD_API_BASE_URL}/playlists",
