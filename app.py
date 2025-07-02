@@ -360,6 +360,7 @@ def transfer_playlist_soundcloud(playlist_id):
 @app.route("/transfer_from_url")
 def transfer_from_url():
     playlist_url = request.args.get("playlist_url")
+    session["playlist_url"] = playlist_url
 
     if "open.spotify.com/playlist" in playlist_url:
         # Extract playlist ID
@@ -414,6 +415,7 @@ def handle_spotify_link(url):
 
 def handle_soundcloud_link(url):
     access_token = session.get("soundcloud_token")
+    print(f"[DEBUG] Access Token: {access_token}")
     if not access_token:
         # Save the URL and redirect for login
         session["playlist_url"] = url
