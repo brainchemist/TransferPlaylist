@@ -4,9 +4,8 @@ import logging
 import os
 import io
 import time
-from flask import Flask, redirect, request, session,render_template
+from flask import Flask, redirect, request, session, render_template
 import requests
-
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -40,9 +39,11 @@ def clean_track_query(title, artist):
     title = title.replace("feat.", "").replace("ft.", "").lower()
     return f"{title.strip()} {artist.lower().strip()}"
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/login_spotify")
 def login_spotify():
@@ -55,6 +56,7 @@ def login_spotify():
         "&scope=playlist-read-private playlist-modify-private"
     )
     return redirect(auth_url)
+
 
 @app.route("/callback_spotify")
 def callback_spotify():
@@ -87,6 +89,7 @@ def login_soundcloud():
     )
     return redirect(auth_url)
 
+
 @app.route("/callback")
 def callback_soundcloud():
     code = request.args.get("code")
@@ -101,14 +104,21 @@ def callback_soundcloud():
         "redirect_uri": SOUNDCLOUD_REDIRECT_URI,
         "code": code,
     }
+
     response = requests.post(SOUNDCLOUD_TOKEN_URL, data=token_data)
+    logging.debug(f"[DEBUG] SoundCloud token response: {response.text}")
+
     if response.status_code != 200:
         logging.error(f"Failed to retrieve access token. Error: {response.text}")
         return f"Failed to retrieve access token. Error: {response.text}", 500
 
-    session["soundcloud_token"] = response.json().get("access_token")
-    logging.info(f"Redirecting back to: {session.get('post_soundcloud_redirect')}")
-    return redirect(session.pop("post_soundcloud_redirect", "/choose_playlist_soundcloud"))
+    token_json = response.json()
+    access_token = token_json.get("access_token")
+    logging.debug(f"[DEBUG] Received access token: {access_token}")
+    session["soundcloud_token"] = access_token
+
+    return redirect(session.pop("post_soundcloud_redirect", "/"))
+
 
 @app.route("/choose_playlist")
 def choose_playlist():
@@ -118,6 +128,7 @@ def choose_playlist():
     response = requests.get(f"{SPOTIFY_API_BASE_URL}/me/playlists", headers=headers)
     playlists = response.json().get("items", [])
     return render_template("choose_playlist_spotify.html", playlists=playlists)
+
 
 @app.route("/transfer_playlist_spotify/<playlist_id>")
 def transfer_playlist_spotify(playlist_id):
@@ -207,7 +218,9 @@ def transfer_playlist_spotify(playlist_id):
             logging.warning(f"No results found for query: {query}")
 
     if not soundcloud_track_ids:
-        return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list, success=False, message="No matching tracks found on SoundCloud. Some tracks may not be available.")
+        return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list,
+                               success=False,
+                               message="No matching tracks found on SoundCloud. Some tracks may not be available.")
 
     image_url = playlist_data.get("images", [{}])[0].get("url")
     image_data = None
@@ -249,10 +262,13 @@ def transfer_playlist_spotify(playlist_id):
     )
 
     if response.status_code != 201:
-        logging.error(f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
-        return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list, success=False, message="Failed to create playlist on SoundCloud. Please try again.")
+        logging.error(
+            f"Failed to create SoundCloud playlist. Status Code: {response.status_code}, Response: {response.text}")
+        return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list,
+                               success=False, message="Failed to create playlist on SoundCloud. Please try again.")
 
-    return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list, success=True, message="Playlist created successfully!")
+    return render_template("transfer_playlist_spotify.html", playlist_name=playlist_name, tracks=track_list,
+                           success=True, message="Playlist created successfully!")
 
 
 @app.route("/choose_playlist_soundcloud")
@@ -263,6 +279,7 @@ def choose_playlist_soundcloud():
     response = requests.get(f"{SOUNDCLOUD_API_BASE_URL}/me/playlists", headers=headers)
     playlists = response.json()
     return render_template("choose_playlist_soundcloud.html", playlists=playlists)
+
 
 @app.route("/transfer_playlist_soundcloud/<playlist_id>")
 def transfer_playlist_soundcloud(playlist_id):
@@ -335,7 +352,8 @@ def transfer_playlist_soundcloud(playlist_id):
             headers={"Authorization": f"Bearer {session['spotify_token']}"},
             params={"q": query, "type": "track", "limit": 1}
         )
-        print(f" → Found: {search_response.status_code == 200 and search_response.json().get('tracks', {}).get('items')}")
+        print(
+            f" → Found: {search_response.status_code == 200 and search_response.json().get('tracks', {}).get('items')}")
         if search_response.status_code == 200:
             search_json = search_response.json()
             items = search_json.get("tracks", {}).get("items")
@@ -355,42 +373,29 @@ def transfer_playlist_soundcloud(playlist_id):
         if add_response.status_code != 201:
             return "Failed to add tracks to Spotify playlist", 400
 
-    return render_template("transfer_playlist_soundcloud.html", playlist_name=playlist_title,)
+    return render_template("transfer_playlist_soundcloud.html", playlist_name=playlist_title, )
+
 
 @app.route("/transfer_from_url")
 def transfer_from_url():
     playlist_url = request.args.get("playlist_url")
-    session["playlist_url"] = playlist_url
+    if not playlist_url:
+        playlist_url = session.get("playlist_url")
+    else:
+        session["playlist_url"] = playlist_url
+
+    if not playlist_url:
+        return "Missing playlist URL", 400
 
     if "open.spotify.com/playlist" in playlist_url:
-        # Extract playlist ID
-        playlist_id = playlist_url.split("/")[-1].split("?")[0]
-
-        sp_token = session.get("spotify_token")
-        if not sp_token:
-            session["playlist_url"] = playlist_url
-            session["transfer_direction"] = "spotify_to_soundcloud"
-            return redirect("/login_spotify?redirect=/transfer_from_url")
-
-        headers = {"Authorization": f"Bearer {sp_token}"}
-        playlist = requests.get(f"{SPOTIFY_API_BASE_URL}/playlists/{playlist_id}", headers=headers).json()
-
-        tracks_to_transfer = []
-        for item in playlist.get("tracks", {}).get("items", []):
-            track = item.get("track")
-            if track:
-                name = track.get("name", "")
-                artist = track.get("artists", [{}])[0].get("name", "")
-                tracks_to_transfer.append({"name": name, "artist": artist})
-
-        session["tracks_to_transfer"] = tracks_to_transfer
-        session["transfer_direction"] = "spotify_to_soundcloud"
-        return redirect("/login_soundcloud?redirect=/complete_transfer")
+        session["direction"] = "spotify_to_soundcloud"
+        return redirect("/login_spotify?redirect=/complete_transfer")
 
     elif "soundcloud.com" in playlist_url:
-        return handle_soundcloud_link(playlist_url)
+        session["direction"] = "soundcloud_to_spotify"
+        return redirect("/login_soundcloud?redirect=/complete_transfer")
 
-    return "Unsupported URL format", 400
+    return "Unsupported playlist link format", 400
 
 
 def handle_spotify_link(url):
@@ -412,6 +417,7 @@ def handle_spotify_link(url):
     session["tracks_to_transfer"] = tracks
     session["transfer_direction"] = "spotify_to_soundcloud"
     return redirect("/login_soundcloud?redirect=/complete_transfer")
+
 
 def handle_soundcloud_link(url):
     access_token = session.get("soundcloud_token")
@@ -446,7 +452,6 @@ def handle_soundcloud_link(url):
     session["tracks_to_transfer"] = tracks
     session["transfer_direction"] = "soundcloud_to_spotify"
     return redirect("/login_spotify?redirect=/complete_transfer")
-
 
 
 @app.route("/complete_transfer")
