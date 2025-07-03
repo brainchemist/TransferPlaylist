@@ -12,6 +12,13 @@
         <p>Select a feature:</p>
         <a href="/login_spotify">Transfer from Spotify to SoundCloud</a><br>
         <a href="/login_soundcloud?redirect=/choose_playlist_soundcloud">Transfer from SoundCloud to Spotify</a>
+        <form action="/transfer_from_url" method="get">
+            <label for="playlist_url">Enter Playlist URL:</label><br>
+            <input type="text" id="playlist_url" name="playlist_url" placeholder="Paste Spotify or SoundCloud playlist URL here" required>
+            <br><br>
+            <button type="submit">Transfer Playlist</button>
+        </form>
+
     </div>
 </body>
 </html>

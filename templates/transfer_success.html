@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Transfer Result</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='sstyles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Playlist Transfer Result</h1>
+        <h2>{{ playlist_name }}</h2>
+
+        {% if success %}
+            <p class="success">✅ Playlist transferred successfully!</p>
+        {% else %}
+            <p class="error">⚠️ Some tracks could not be found and were not transferred.</p>
+        {% endif %}
+
+        <h3>Tracks Transferred:</h3>
+        <ul class="track-list">
+            {% for track in tracks %}
+                <li>
+                    {{ track.name }} — {{ track.artist }}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <a href="/" class="back-link">← Back to Home</a>
+    </div>
+</body>
+</html>
